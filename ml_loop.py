@@ -3,6 +3,23 @@ ML loop
 '''
 
 
+import pandas as pd
+import numpy as np
+import seaborn as sb
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score as accuracy,\
+    precision_recall_fscore_support, classification_report, roc_auc_score, \
+    precision_recall_curve, confusion_matrix
+from sklearn import preprocessing, svm
+from sklearn.model_selection import train_test_split, TimeSeriesSplit
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, \
+BaggingClassifier
+
+
 
 def ml_loop(clfrs, params, time_splits, label, output_df, \
             outcome_time, date_col, df):
@@ -14,7 +31,7 @@ def ml_loop(clfrs, params, time_splits, label, output_df, \
         print('Working on the {} classifier:'.format(name))
         # unpack parameters list
         param_vals = params[name]
-        for p_dict in in ParameterGrid(param_vals):
+        for p_dict in ParameterGrid(param_vals):
             for t_split in time_splits:
 
                 train = t_split['train']
@@ -29,13 +46,12 @@ def ml_loop(clfrs, params, time_splits, label, output_df, \
                 try:
                     print("Training from {} to {} to predict the" +\
                           "outcome from {} to {} and testing on outcomes from " +\
-                          "{} to {}").format(str(start_date_train)[:10],
+                          "{} to {}".format(str(start_date_train)[:10],
                                              str(end_date_train)[:10],
                                              str(start_date_outcome)[:10],
                                              str(end_date_outcome)[:10],
                                              str(start_date_test)[:10],
-                                             str(end_date_test)[:10]
-                                             ))
+                                             str(end_date_test)[:10]))
                     model_clfr = clfr.set_params(**p_dict)
 
                     X_train = train.drop(columns=label)
@@ -46,7 +62,6 @@ def ml_loop(clfrs, params, time_splits, label, output_df, \
 
                     model_clfr = clfr.fit(X_train, y_train)
 
-                    output_df.loc[]
                 except:
                     print('ERROR')
 
