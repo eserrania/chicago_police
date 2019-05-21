@@ -25,8 +25,9 @@ def split_sets(df, outcome_time, date_col, verbose=False):
     count = 0
     set_list = []
     for train_years in range(1, max_train_years + 1):
-        print("Sets trained with {} year(s) of data".format(train_years))
-        print()
+        if verbose:
+            print("Sets trained with {} year(s) of data".format(train_years))
+            print()
         end_date_test = start_date_train
         increment = 0
         while end_date_test + np.timedelta64(1,'Y') <= final_date: 
