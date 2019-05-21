@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 
-def split_sets(df, outcome_time, date_col):
+def split_sets(df, outcome_time, date_col, verbose=False):
     '''
     Given a dataframe, the length of a time period as a numpy Timedelta object, 
     and a date column, returns a list of dictionaries, with each item in the 
@@ -38,23 +38,25 @@ def split_sets(df, outcome_time, date_col):
                 outcome_time
             end_date_test = end_date_outcome + outcome_time - \
                 np.timedelta64(1,'D')   
-
-            print(
-                ("Training set {} is trained from {} to {} to predict the " +\
-                "outcome from {} to {} and tested on outcomes in " +\
-                "{} to {}").format(
-                    str(count), str(start_date_train)[:10],
-                    str(end_date_train)[:10],
-                    str(end_date_train + np.timedelta64(1,'D'))[:10], 
-                    str(end_date_outcome)[:10], 
-                    str(end_date_outcome + np.timedelta64(1,'D'))[:10],
-                    str(end_date_test)[:10]))
+            if verbose:
+                print(
+                    ("Training set {} is trained from {} to {} to predict the " +\
+                    "outcome from {} to {} and tested on outcomes in " +\
+                    "{} to {}").format(
+                        str(count), str(start_date_train)[:10],
+                        str(end_date_train)[:10],
+                        str(end_date_train + np.timedelta64(1,'D'))[:10], 
+                        str(end_date_outcome)[:10], 
+                        str(end_date_outcome + np.timedelta64(1,'D'))[:10],
+                        str(end_date_test)[:10]))
             train_df = df.loc[df[date_col] <= end_date_outcome]
             test_df = df.loc[(df[date_col] > end_date_outcome) & \
                 (df[date_col] <= end_date_test)]
-            set_dict = {"train": train_df, "test": test_df, \
-                "end_date_train": end_date_train, \
-                "start_date_test": end_date_train + np.timedelta64(1,'D'), 
+            set_dict = {"train": train_df, "test": test_df,
+                "start_date_train": start_date_train,
+                "end_date_train": end_date_train,
+                "start_date_test": end_date_outcome + np.timedelta64(1,'D'),
+                "end_date_test" : end_date_test, 
                 "outcome_time": outcome_time}
             set_list.append(set_dict)
             increment += 1
