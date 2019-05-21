@@ -56,6 +56,8 @@ def split_sets(df, outcome_time, date_col, verbose=False):
             set_dict = {"train": train_df, "test": test_df,
                 "start_date_train": start_date_train,
                 "end_date_train": end_date_train,
+                "start_date_outcome": start_date_outcome,
+                "end_date_outcome": end_date_outcome,
                 "start_date_test": end_date_outcome + np.timedelta64(1,'D'),
                 "end_date_test" : end_date_test, 
                 "outcome_time": outcome_time}
