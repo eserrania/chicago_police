@@ -26,7 +26,7 @@ def split_sets(df, outcome_time, date_col):
         print()
         end_date_test = start_date_train
         increment = 0
-        while end_date_test <= final_date: 
+        while end_date_test + np.timedelta64(1,'Y') <= final_date: 
 
             end_date_train = start_date_train + \
                 (np.timedelta64(train_years + increment,'Y')) - \
