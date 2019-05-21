@@ -4,6 +4,19 @@ import networkx as nx
 import math
 import matplotlib.pyplot as plt
 
+def generate_features(officer_df, salary_df, allegation_df, end_date_train,
+                      bins=4):
+    '''
+    '''
+    officer_df = create_gender_dummy(officer_df)
+    officer_df = create_race_dummies(officer_df)
+    officer_df = create_age_dummies(officer_df, end_date_train)
+    officer_df = create_tenure_dummies(officer_df, end_date_train)
+    officer_df = create_rank_dummies(officer_df, salary_df, end_date_train)
+    officer_df = gen_allegation_features(officer_df, allegation_df, end_date_train)
+    return officer_df
+
+
 
 def create_gender_dummy(officer_df):
     '''
@@ -29,31 +42,31 @@ def create_race_dummies(officer_df):
     return officer_df
 
 
-def create_age_dummies(officer_df, split_date, bins=4):
+def create_age_dummies(officer_df, end_date_train, bins=4):
     '''
     '''
             
-    officer_df['age'] = pd.cut(split_date.year - officer_df.birth_year, bins)
+    officer_df['age'] = pd.cut(end_date_train.year - officer_df.birth_year, bins)
     officer_df = pd.get_dummies(officer_df, columns=['age'])
     return officer_df
 
 
-def create_tenure_dummies(officer_df, split_date, bins=4):
+def create_tenure_dummies(officer_df, end_date_train, bins=4):
     '''
     '''
-    officer_df['tenure'] = [math.floor(((split_date - date).days) / 365.25) 
+    officer_df['tenure'] = [math.floor(((end_date_train - date).days) / 365.25) 
                             for date in officers.appointed_date]
     officer_df['tenure'] = pd.cut(officer_df.tenure, bins)
     officer_df = pd.get_dummies(officer_df, columns=['tenure'])
     return officer_df
 
 
-def create_rank_dummies(officer_df, salary_df, split_date, bins=4):
+def create_rank_dummies(officer_df, salary_df, end_date_train, bins=4):
     '''
     '''
     officer_df = officer_df.drop(columns=['rank'])
-    salary_df = salary_df[[ryear <= split_date.year for ryear in salary_df.year]]
-    salary_df = salary_df[[date <= split_date for date in salary_df.spp_date]]
+    salary_df = salary_df[[ryear <= end_date_train.year for ryear in salary_df.year]]
+    salary_df = salary_df[[date <= end_date_train for date in salary_df.spp_date]]
     current_ranks = salary_df.groupby('officer_id')['year'].max().to_frame()
     current_ranks = current_ranks.merge(salary_df[['officer_id', 'rank', 'year']],
                                         on=['officer_id', 'year'], how='left')
@@ -64,11 +77,11 @@ def create_rank_dummies(officer_df, salary_df, split_date, bins=4):
     return officer_df.drop(columns=['year'])
 
 
-def gen_allegation_features(officer_df, allegation_df, split_date):
+def gen_allegation_features(officer_df, allegation_df, end_date_train):
     '''
     '''
     
-    allegation_df = allegation_df[allegation_df.incident_date < split_date]
+    allegation_df = allegation_df[allegation_df.incident_date < end_date_train]
     officer_df['number_complaints'] = 0
     officer_df['pct_officer_complaints'] = 0.0
     officer_df['pct_sustained_complaints'] = 0.0
@@ -89,9 +102,9 @@ def gen_allegation_features(officer_df, allegation_df, split_date):
     #internal_allegation_percentile
     
     return officer_df
-    
 
-def create_coaccusals_network(officer_alleg_df, allegation_id, officer_id):
+
+def create_coaccusals_network(allegation_df, allegation_id, officer_id):
     '''
     '''
     G = nx.Graph()
