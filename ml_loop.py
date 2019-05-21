@@ -4,23 +4,39 @@ ML loop
 
 
 
-def ml_loop(clfrs, params, time_splits, label, output_df):
+def ml_loop(clfrs, params, time_splits, label, output_df, \
+            outcome_time, date_col, df):
     '''
     Loops through the classifiers, parameters and train-test pairs and saves
     the results into a pandas dataframe.
     '''
-
     for name, clfr in clfrs.items():
         print('Working on the {} classifier:'.format(name))
         # unpack parameters list
         param_vals = params[name]
         for p_dict in in ParameterGrid(param_vals):
             for t_split in time_splits:
+
                 train = t_split['train']
                 test = t_split['test']
-                time = t_split['time']
+
+                start_date_train = t_split['start_date_train']
+                end_date_train = t_split['end_date_train']
+                start_date_outcome = t_split['start_date_outcome']
+                end_date_outcome = t_split['end_date_outcome']
+                start_date_test = t_split['start_date_test']
+                end_date_test = t_split['end_date_test']
                 try:
-                    print('*** time split {} with parameters {}'.format(time, p_dict))
+                    print("Training from {} to {} to predict the" +\
+                          "outcome from {} to {} and testing on outcomes from " +\
+                          "{} to {}").format(str(start_date_train)[:10],
+                                             str(end_date_train)[:10],
+                                             str(start_date_outcome)[:10],
+                                             str(end_date_outcome)[:10],
+                                             str(start_date_test)[:10],
+                                             str(end_date_test)[:10]
+                                             ))
+                    model_clfr = clfr.set_params(**p_dict)
 
                     X_train = train.drop(columns=label)
                     y_train = train[label]
@@ -59,11 +75,16 @@ def set_parameters(type, which_clfrs=None):
                    'DecisionTree': DecisionTreeClassifier(),
                    'LogisticRegression': LogisticRegressionCV()}
 
-    TEST_PARAMS = {'RandomForest': ,
-                   'DecisionTree': ,
-                   'LogisticRegression' ,}
-
-    ALL_PARAMS = {}
+    ALL_PARAMS = {
+                  'RandomForest': {'n_estimators': [100, 10000],
+                    'max_depth': [5,50], 'max_features': ['sqrt','log2'],
+                    'min_samples_split': [2,10], 'n_jobs':[-1]},
+                  'DecisionTree': {'criterion': ['gini', 'entropy'],
+                    'max_depth': [1,5,10,20,50,100],
+                    'max_features': [None,'sqrt','log2'],
+                    'min_samples_split': [2,5,10]},
+                  'LogisticRegression': { 'penalty': ['l1'], 'C': [0.01]}
+                  }
 
     if type == 'test':
         parameters = TEST_PARAMS
