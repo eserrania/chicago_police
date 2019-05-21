@@ -7,13 +7,15 @@ import matplotlib.pyplot as plt
 def generate_features(officer_df, salary_df, allegation_df, end_date_train,
                       bins=4):
     '''
+
     '''
     officer_df = create_gender_dummy(officer_df)
     officer_df = create_race_dummies(officer_df)
     officer_df = create_age_dummies(officer_df, end_date_train)
     officer_df = create_tenure_dummies(officer_df, end_date_train)
     officer_df = create_rank_dummies(officer_df, salary_df, end_date_train)
-    officer_df = gen_allegation_features(officer_df, allegation_df, end_date_train)
+    officer_df = gen_allegation_features(officer_df, allegation_df,
+                                         end_date_train)
     
     return officer_df
 
@@ -30,7 +32,7 @@ def create_gender_dummy(officer_df):
 
 def create_race_dummies(officer_df):
     '''
-    Given the officers dataframe, convert the gender variable into a dummy. 
+    Given the officers dataframe, creates race dummies. 
     '''
     officer_df.race = [race.lower().replace('/', '_').replace(' ', '') 
                        for race in officer_df.race]
@@ -40,6 +42,9 @@ def create_race_dummies(officer_df):
 
 def create_age_dummies(officer_df, end_date_train, bins=4):
     '''
+    Given the officers dataframe and the end date of the training data set,
+        calculates the officer´s age at that time, discretizes the age, and
+        creates dummies for each age range.
     '''
             
     officer_df['age'] = pd.cut(end_date_train.year - officer_df.birth_year, bins)
@@ -49,6 +54,9 @@ def create_age_dummies(officer_df, end_date_train, bins=4):
 
 def create_tenure_dummies(officer_df, end_date_train, bins=4):
     '''
+    Given the officers dataframe and the end date of the training data set,
+        calculates the officer´s age at that time, discretizes the age, and
+        creates dummies for each age range.
     '''
     officer_df['tenure'] = [math.floor(((end_date_train - date).days) / 365.25) 
                             for date in officers.appointed_date]
@@ -59,6 +67,9 @@ def create_tenure_dummies(officer_df, end_date_train, bins=4):
 
 def create_rank_dummies(officer_df, salary_df, end_date_train, bins=4):
     '''
+    Given the officers dataframe, their salary history and the end date of the
+        training data set creates dummy variables with the officer's rank at 
+        that time.
     '''
     officer_df = officer_df.drop(columns=['rank'])
     salary_df = salary_df[[ryear <= end_date_train.year for ryear in salary_df.year]]
@@ -75,9 +86,13 @@ def create_rank_dummies(officer_df, salary_df, end_date_train, bins=4):
 
 def gen_allegation_features(officer_df, allegation_df, end_date_train):
     '''
+    Given the officers dataframe and the their complaint history, creates 
+        variables with their complaint counts, percentage of officer complaints,
+        and percentage of sustained complaints.
     '''
     
     allegation_df = allegation_df[allegation_df.incident_date < end_date_train]
+    allegation_df = allegation_df[allegation_df['officer_id'].isin(officer_df.id.unique())]
     officer_df['number_complaints'] = 0
     officer_df['pct_officer_complaints'] = 0.0
     officer_df['pct_sustained_complaints'] = 0.0
@@ -87,13 +102,13 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
     
     
     for oid in allegation_df.officer_id.unique():
-        officer_df.loc[oid, 'number_complaints'] = count[oid]
+        officer_df.loc[officer_df.id == oid, 'number_complaints'] = count[oid]
         
         if oid in off_complaints.index:
-            officer_df.loc[oid, 'pct_officer_complaints'] = off_complaints[oid] / count[oid]
+            officer_df.loc[officer_df.id == oid, 'pct_officer_complaints'] = off_complaints[oid] / count[oid]
         
         if oid in sustained.index:
-            officer_df.loc[oid, 'pct_sustained_complaints'] = sustained[oid] / count[oid]
+            officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = sustained[oid] / count[oid]
 
     #internal_allegation_percentile
     
