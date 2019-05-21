@@ -8,7 +8,10 @@ def split_sets(df, outcome_time, date_col):
     and a date column, returns a list of dictionaries, with each item in the 
     list representing a train, test set, and each dictionary having
     "train" or "test" as keys and the corresponding dataframe with the time
-     period as values.
+     period as values, along with "end_date_train", "start_date_test", and
+     "outcome_time" which represent the last date of the training set, the first
+     date of the testing set, and the number of years we use for the outcome,
+     respectively.
 
     Creates as many train and test sets as possible where there is at least 
     one year of data to train on for each set.
@@ -49,7 +52,10 @@ def split_sets(df, outcome_time, date_col):
             train_df = df.loc[df[date_col] <= end_date_outcome]
             test_df = df.loc[(df[date_col] > end_date_outcome) & \
                 (df[date_col] <= end_date_test)]
-            set_dict = {"train": train_df, "test": test_df}
+            set_dict = {"train": train_df, "test": test_df, \
+                "end_date_train": end_date_train, \
+                "start_date_test": end_date_train + np.timedelta64(1,'D'), 
+                "outcome_time": outcome_time}
             set_list.append(set_dict)
             increment += 1
             count += 1
