@@ -1,4 +1,4 @@
-import pandas as 
+import pandas as pd
 import numpy as np
 import networkx as nx
 import math
@@ -14,19 +14,14 @@ def generate_features(officer_df, salary_df, allegation_df, end_date_train,
     officer_df = create_tenure_dummies(officer_df, end_date_train)
     officer_df = create_rank_dummies(officer_df, salary_df, end_date_train)
     officer_df = gen_allegation_features(officer_df, allegation_df, end_date_train)
+    
     return officer_df
 
 
 
 def create_gender_dummy(officer_df):
     '''
-    Transforms gender into a dummy variable for each value of the specified variables.
-
-    Input:
-        df: (pandas.DataFrame) a data frame
-
-    Returns:
-        pandas.DataFrame
+    Given the officers dataframe, convert the gender variable into a dummy. 
     '''
     officer_df.gender = np.where(officer_df.gender == 'F', 1 , 0)
     
@@ -35,6 +30,7 @@ def create_gender_dummy(officer_df):
 
 def create_race_dummies(officer_df):
     '''
+    Given the officers dataframe, convert the gender variable into a dummy. 
     '''
     officer_df.race = [race.lower().replace('/', '_').replace(' ', '') 
                        for race in officer_df.race]
