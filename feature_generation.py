@@ -19,7 +19,17 @@ def generate_features(officer_df, salary_df, allegation_df, end_date_train,
     
     return officer_df
 
-
+def create_sustained_outcome(officer_df, allegation_df, end_date_train):
+    '''
+    Given the officers and merged allegation dfs, creates an outcome column
+    indicating whether or not the officer had a sustained investigation.
+    '''
+    outcome_window = allegation_df.loc[
+        allegation_df.incident_date > end_date_train]
+    sustained = outcome_window.loc[outcome_window.final_finding == "SU"]
+    officer_df['sustained_outcome'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(sustained.officer_id) else 0, axis=1)
+    return officer_df
 
 def create_gender_dummy(officer_df):
     '''

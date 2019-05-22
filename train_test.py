@@ -2,7 +2,10 @@ import pandas as pd
 import numpy as np
 import math
 
-def split_sets(df, outcome_time, date_col, verbose=False):
+pd.options.mode.chained_assignment = None
+
+def split_sets(df, outcome_time, date_col, start_date='01-01-2010', 
+                verbose=False):
     '''
     Given a dataframe, the length of a time period as a numpy Timedelta object, 
     and a date column, returns a list of dictionaries, with each item in the 
@@ -18,7 +21,9 @@ def split_sets(df, outcome_time, date_col, verbose=False):
 
     Function will also print the corresponding date cutoffs for each set.
     '''
-    start_date_train = df[date_col].min()
+    start_date_train = pd.to_datetime(start_date)
+    df[date_col] = df.apply(lambda x: x[date_col].tz_localize(None), axis=1)
+    df = df.loc[df[date_col] >= start_date_train]
     final_date = df[date_col].max()
     max_train_years = round(((final_date - \
         2 * (outcome_time)) - start_date_train) / np.timedelta64(1,'Y'))
@@ -56,7 +61,7 @@ def split_sets(df, outcome_time, date_col, verbose=False):
             set_dict = {"train": train_df, "test": test_df,
                 "start_date_train": start_date_train,
                 "end_date_train": end_date_train,
-                "start_date_outcome": start_date_outcome,
+                "start_date_outcome": end_date_train + np.timedelta64(1,'D'),
                 "end_date_outcome": end_date_outcome,
                 "start_date_test": end_date_outcome + np.timedelta64(1,'D'),
                 "end_date_test" : end_date_test, 
