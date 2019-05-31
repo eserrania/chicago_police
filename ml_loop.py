@@ -1,79 +1,142 @@
 '''
-ML loop
+Machine learning functions
 '''
 
-
+from __future__ import division
 import pandas as pd
+import re
 import numpy as np
-import seaborn as sb
+import os
 import matplotlib.pyplot as plt
+import pylab as pl
+from datetime import timedelta, datetime
+import random
+from scipy import optimize
+import time
+import seaborn as sns
+from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix, accuracy_score
+from sklearn import preprocessing, svm, metrics, tree, decomposition, svm
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier
+from sklearn.linear_model import LogisticRegression, Perceptron, SGDClassifier, OrthogonalMatchingPursuit, LogisticRegressionCV
+from sklearn.neighbors.nearest_centroid import NearestCentroid
+from sklearn.naive_bayes import GaussianNB, MultinomialNB, BernoulliNB
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score as accuracy,\
-    precision_recall_fscore_support, classification_report, roc_auc_score, \
-    precision_recall_curve, confusion_matrix, recall_score
-from sklearn import preprocessing, svm
-from sklearn.model_selection import train_test_split, ParameterGrid
-from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import LinearSVC
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, \
-BaggingClassifier
+from sklearn.model_selection import train_test_split, cross_validate, GridSearchCV, ParameterGrid
+from sklearn.metrics import *
+from sklearn.preprocessing import StandardScaler
+import itertools
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+pd.options.mode.chained_assignment = None
+SEED = 84
 
 
+# KEEP TRACK OF best models and get features importances
+################################################################################
+# ML loop
+################################################################################
 
-def ml_loop(clfrs, params, time_splits, label, output_df, \
-            outcome_time, date_col):
+def classifier_loop(df, grid, clfrs_to_run, metric_dict, start_date, outcome_time,
+    date_col, label, split_length, na_lst, quant_lst, disc_lst,
+    cols_to_keep, feature_lst, preds_drop, metrics, plot=False, save=False):
     '''
     Loops through the classifiers, parameters and train-test pairs and saves
     the results into a pandas dataframe.
+
+    Inputs:
+        - df (pandas dataframe): a dataframe
+        - grid (dict): a parameter grid
+        - clfrs_to_run (dict): chosen classifiers to be ran
+        - metric_dict (dict): dictionary of metrics with threshold lists
+        - start_date (str): start date for data (mm/dd/yy)
+        - outcome_time (int): target number of days after which to intervene on
+            non-funded projects
+        - date_col (str): date column
+        - label (str): name of label column
+        - split_length (str): frequency to split on ('6MS', '6M' ...)
+        - na_lst (lst): list of tuples, where each tuple contains the variable
+            to be imputed and the variable to impute the mean by
+        - quant_lst (lst): list of columns names that will be converted into
+            frequency quantiles to reduce their dimensionality
+        - disc_lst (lst): list of tuples, where each tuple contains the column
+            to be discretized and the number of categories
+        - cols_to_keep (lst): list of columns that will be kept in the model
+        - feature_lst (lst): list of columns that need to be converted into dummies
+        - preds_drop (lst): list of columns that need to be dropped before
+            classification
+        - metrics (str): choose to get population or regular metrics
+        - out_type (str): 'analysis' for assignment metrics, 'top_5' for
+            targeted k
+        - save (bool): saves output df into csv if set to true
+        - plt (bool): plots precision recall curve if set to true
+
+    Returns a pandas dataframe with the looping results
+
+    Source: Adapted from rayid Ghani's
+        https://github.com/rayidghani/magicloops/blob/master/simpleloop.py
     '''
+    # unpack classifier and parameter dictionaries
+    clfrs, params = define_ml_models(grid, clfrs_to_run)
+    # create output dataframe
+    output_df = create_output_df(metric_dict)
+    # calls split datasets that impute and create dummies locally
+    temp_lst = temporal_split(df, start_date, outcome_time, date_col, split_length,
+                       na_lst, quant_lst, disc_lst, cols_to_keep,
+                       feature_lst)
+    #loops through classifier dictionary
     for name, clfr in clfrs.items():
-        print('Working on the {} classifier:'.format(name))
-        # unpack parameters list
         param_vals = params[name]
-        for p_dict in ParameterGrid(param_vals):
-            print('*** with parameters {}'.format(p_dict))
-            for t_split in time_splits:
+        # unpack the list of parameters and then run loop on combination
+        for p in ParameterGrid(param_vals):
+            #print(p)
+            # loop through split data/training sets
+            for set, time_dict in enumerate(temp_lst):
+                print('*****************')
+                # get data from dictionary
+                train = time_dict['train']
+                test = time_dict['test']
+                train_start = time_dict['start_date_train']
+                train_end = time_dict['end_date_train']
+                test_start = time_dict['start_date_test']
+                test_end = time_dict['end_date_test']
 
-                train = t_split['train']
-                test = t_split['test']
+                # instantiate classifier
+                cl = clfr.set_params(**p)
 
-                start_date_train = t_split['start_date_train']
-                end_date_train = t_split['end_date_train']
-                start_date_outcome = t_split['start_date_outcome']
-                end_date_outcome = t_split['end_date_outcome']
-                start_date_test = t_split['start_date_test']
-                end_date_test = t_split['end_date_test']
-                print(("Training from {} to {} to predict the" +\
-                      " outcome from {} to {} and testing on outcomes from " +\
-                      " {} to {}").format(str(start_date_train)[:10],
-                                         str(end_date_train)[:10],
-                                         str(start_date_outcome)[:10],
-                                         str(end_date_outcome)[:10],
-                                         str(start_date_test)[:10],
-                                         str(end_date_test)[:10]))
-                model_clfr = clfr.set_params(**p_dict)
+                print('** Working on the {} classifier {} with parameters {}.'.format(
+                      name, clfr, p))
+                print('* Training from {} to {} and testing from {} to {}.'.format(
+                      train_start, train_end, test_start, test_end))
 
-                X_train = train.drop(columns=label)
+                # separate into train, test
+                X_train = train.drop(columns=preds_drop)
                 y_train = train[label]
-
-                X_test = test.drop(columns=label)
+                X_test = test.drop(columns=preds_drop)
                 y_test = test[label]
 
-                model_clfr = clfr.fit(X_train, y_train)
+                cl.fit(X_train, y_train)
 
-                pred_probs = model_clfr.predict_proba(X_test)[:, 1]
+                if name == 'SVM':
+                    pred_probs = cl.decision_function(X_test)
+                else:
+                    pred_probs = cl.predict_proba(X_test)[:, 1]
 
-                cutoff_idx = 0.5
-                bin_pred = [1 if x > cutoff_idx else 0 for x in pred_probs]
-                rec = recall_score(y_test, bin_pred)
+                importances = cl.feature_importances_
+                # update metric dataframe
+                update_metrics_df(output_df, y_test, pred_probs, name, importances,
+                                  p, set, train_start, train_end,
+                                  test_start, test_end, metrics)
+                if plot:
+                    plot_precision_recall_n(y_test, pred_probs, name, plot)
 
-                print('**** Model recall is {}'.format(rec))
+    if save:
+    output_df.to_csv(file_name)
 
+    return output_df
 
-
-
-def set_parameters(type, which_clfrs=None):
+def define_ml_models(type, chosen_clfrs=None):
     '''
     This function defines which models to run on a test or full set of
     parameters.
@@ -91,31 +154,289 @@ def set_parameters(type, which_clfrs=None):
     Source: Adapted from rayid Ghani's
         https://github.com/rayidghani/magicloops/blob/master/simpleloop.py
     '''
-
-    classifiers = {'RandomForest': RandomForestClassifier(),
-                   'DecisionTree': DecisionTreeClassifier(),}
+    classifiers = { 'RandomForest': RandomForestClassifier(),
+                    'ExtraTrees': ExtraTreesClassifier(),
+                    'AdaBoost': AdaBoostClassifier(),
+                    'DecisionTree': DecisionTreeClassifier(),
+                    'SVM': svm.LinearSVC(),
+                    'GradientBoosting': GradientBoostingClassifier(),
+                    'Bagging': BaggingClassifier(),
+                    'LogisticRegression': LogisticRegressionCV(),
+                    'KNN': KNeighborsClassifier()}
 
     ALL_PARAMS = {
-                  'RandomForest': {'n_estimators': [100],
-                    'max_depth': [5], 'max_features': ['sqrt'],
-                    'min_samples_split': [2], 'n_jobs':[-1]},
-                  'DecisionTree': {'criterion': ['gini', 'entropy'],
-                    'max_depth': [1,5,10,20,50,100],
-                    'max_features': [None,'sqrt','log2'],
-                    'min_samples_split': [2,5,10]}}
+        'RandomForest': {'criterion': ['gini', 'entropy'],
+                         'n_estimators': [10, 20, 50, 100],
+                         'max_depth': [5, 20, None],
+                         'min_samples_split': [10, 100, 500],
+                         'n_jobs': [-1],
+                         'random_state': [SEED]},
+        'SVM': {'penalty': ['l2'],
+                'C': [0.1, 1.0, 50.0]},
+        'KNN': {'n_neighbors': [5]},
+        'DecisionTree': {'criterion': ['gini', 'entropy'],
+                   'max_depth': [2, 5],
+                   'min_samples_leaf': [10, 500, 1000],
+                   'min_samples_split': [5, 50, 100]},
+        'AdaBoost': {'n_estimators': [10, 50, 100],
+                     'learning_rate': [0.01, 0.1, 0.5, 1],
+                     'random_state': [SEED]},
+        'Bagging': {'n_estimators': [10, 50, 100],
+                    'bootstrap': [True, False],
+                    'max_samples': [0.2, 1.0],
+                    'n_jobs': [-1],
+                    'random_state': [SEED]},
+        'GradientBoosting':{'n_estimators': [10, 100, 200],
+                            'learning_rate': [0.5, 0.2, 0.05],
+                            'max_depth': [2, 5],
+                            'min_samples_split': [10, 100, 500],
+                            'random_state': [SEED]},
+        'LogisticRegression': { 'penalty': ['l2', 'l1'],
+                                'Cs': [1, 10, 100],
+                                'solver': ['liblinear'],
+                                'random_state': [SEED]},
+        'ExtraTrees': {'n_estimators': [10, 100, 500],
+                       'max_depth': [2, 5, 10],
+                       'n_jobs': [-1],
+                       'random_state': [SEED]}
+                                }
+
+    TEST_PARAMS = {
+    'RandomForest':{'n_estimators': [10],
+                        'max_depth': [5],
+                        'min_samples_split': [5],
+                        'n_jobs': [-1],
+                        'random_state': [1992]},
+    'LogisticRegression': { 'penalty': ['l2'],
+                                'Cs': [1]},
+    'KNN': {'n_neighbors': [5]},
+    'DecisionTree': {}}
 
     if type == 'test':
-        parameters = TEST_PARAMS
+        PARAMETERS = TEST_PARAMS
     else:
-        parameters = ALL_PARAMS
+        PARAMETERS = ALL_PARAMS
 
-    if which_clfrs:
-        # filter out chosen classifiers
-        if all (key in classifiers for key in which_clfrs):
-            clfs = {key: classifiers[key] for key in which_clfrs}
-            params = {key: parameters[key] for key in which_clfrs}
+    if chosen_clfrs:
+        if all (key in classifiers for key in chosen_clfrs):
+            clfs = {key: classifiers[key] for key in chosen_clfrs}
+            params = {key: PARAMETERS[key] for key in chosen_clfrs}
             return clfs, params
         else:
             print('Error: Classifier not in list or named incorrectly')
+            return
     else:
-        return classifiers, parameters
+        return classifiers, PARAMETERS
+
+################################################################################
+# Evaluation functions
+################################################################################
+
+def create_output_df(metric_dict):
+    '''
+    Creates dataframe to store evaluation results.
+
+    Inputs:
+        - metric_dict: (lst) dictionary with evaluation metrics and thresholds.
+            Valid metrics are precision, recall, auc-roc, accuracy, f1
+    '''
+
+    # minimum columns for output dataframe
+    col_lst = ['model', 'importances', 'parameters', 'set', 'train_start', 'train_end',
+               'test_start', 'test_end']
+    # dealing with evaluation metrics
+    for metric, threshold_lst in metric_dict.items():
+        if metric == 'precision' or metric == 'recall' or metric == 'f1' or metric == 'accuracy':
+            temp_lst = [metric +'_at_' + str(k) for k in threshold_lst]
+            col_lst.extend(temp_lst)
+        else:
+            col_lst.append(metric)
+
+    output_df = pd.DataFrame(columns=col_lst)
+
+    return output_df
+
+def update_metrics_df(output_df, y_test, pred_probs, name, importances, parameters, set,
+                      train_start, train_end, test_start, test_end, metrics):
+    '''
+    Updates metrics dataframe
+
+    Inputs:
+        - output_df: (pandas df) a pandas dataframe with evaluation metrics
+        - y_test:
+        - pred_probs:
+    '''
+    # minimum columns to identify model
+    result_lst = [name, importances, parameters, set, train_start, train_end,
+                  test_start, test_end]
+
+    # list of columns to fill in metrics for
+    col_lst = output_df.columns[len(result_lst):]
+
+    # for each column, identify the metric and compute it
+    for col in col_lst:
+        lst = re.split('_', col)
+        metric = lst[0]
+        if len(lst) > 2:
+            t = int(lst[2])
+        if metric == 'precision':
+            result = precision_at_k(y_test, pred_probs, t, metrics)
+        elif metric == 'recall':
+            result = recall_at_k(y_test, pred_probs, t, metrics)
+        elif metric == 'f1':
+            result = f1_at_k(y_test, pred_probs, t, metrics)
+        elif metric == 'accuracy':
+            result = accuracy_at_k(y_test, pred_probs, t, metrics)
+        elif metric == 'auc-roc':
+            result = roc_auc_score(y_test, pred_probs)
+
+        result_lst.append(result)
+
+    # update the row
+    output_df.loc[len(output_df)] = result_lst
+
+def plot_roc(name, probs, true, output_type):
+    '''
+    Plots the ROC curve
+
+    Source: Rayid Ghani
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    fpr, tpr, thresholds = roc_curve(true, probs)
+    roc_auc = auc(fpr, tpr)
+    pl.clf()
+    pl.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
+    pl.plot([0, 1], [0, 1], 'k--')
+    pl.xlim([0.0, 1.05])
+    pl.ylim([0.0, 1.05])
+    pl.xlabel('False Positive Rate')
+    pl.ylabel('True Positive Rate')
+    pl.title(name)
+    pl.legend(loc="lower right")
+    if (output_type == 'save'):
+        plt.savefig(name)
+    elif (output_type == 'show'):
+        plt.show()
+    else:
+        plt.show()
+
+def gen_binary_at_k(predicted_scores, k, metrics=None):
+    '''
+    Maps the predicted labels to 0 or 1 given a threshold of k / 100
+    '''
+    if metrics == 'pop':
+        # k is the target percent of population
+        #print('population metrics')
+        threshold = int(len(predicted_scores) * (k / 100.0))
+        binary_preds = [1 if x < threshold else 0 for x in range(len(predicted_scores))]
+    else:
+        #print('regular metrics')
+        threshold = k / 100.0
+        binary_preds = [1 if x > threshold else 0 for x in predicted_scores]
+
+    return binary_preds
+
+def f1_at_k(y_true, y_scores, k, metrics):
+    '''
+    Computes the f1 score at different thresholds (k/100)
+
+    Source: adapted from Rayid Ghani's precision_at_k and recall_at_k functions
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
+    f1 = f1_score(y_true_sorted, preds_at_k)
+
+    return f1
+
+def precision_at_k(y_true, y_scores, k, metrics):
+    '''
+    Computes the precision score at different thresholds (k/100)
+
+    Source: Rayid Ghani
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
+    precision = precision_score(y_true_sorted, preds_at_k)
+
+    return precision
+
+def recall_at_k(y_true, y_scores, k, metrics):
+    '''
+    Computes the recall score at different thresholds (k/100)
+
+    Source: Rayid Ghani
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
+    recall = recall_score(y_true_sorted, preds_at_k)
+
+    return recall
+
+def accuracy_at_k(y_true, y_scores, k, metrics):
+    '''
+    Computes the accuracy score at different thresholds (k/100)
+
+    Source: adapted from Rayid Ghani's precision_at_k and recall_at_k functions
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
+    accuracy = accuracy_score(y_true_sorted, preds_at_k)
+
+    return accuracy
+
+def plot_precision_recall_n(y_true, y_prob, model_name, output_type):
+    '''
+    Plots precision recall
+
+    Source: Rayid Ghani
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    from sklearn.metrics import precision_recall_curve
+    y_score = y_prob
+    precision_curve, recall_curve, pr_thresholds = precision_recall_curve(y_true, y_score)
+    precision_curve = precision_curve[:-1]
+    recall_curve = recall_curve[:-1]
+    pct_above_per_thresh = []
+    number_scored = len(y_score)
+    for value in pr_thresholds:
+        num_above_thresh = len(y_score[y_score>=value])
+        pct_above_thresh = num_above_thresh / float(number_scored)
+        pct_above_per_thresh.append(pct_above_thresh)
+    pct_above_per_thresh = np.array(pct_above_per_thresh)
+
+    plt.clf()
+    fig, ax1 = plt.subplots()
+    ax1.plot(pct_above_per_thresh, precision_curve, 'b')
+    ax1.set_xlabel('percent of population')
+    ax1.set_ylabel('precision', color='b')
+    ax2 = ax1.twinx()
+    ax2.plot(pct_above_per_thresh, recall_curve, 'r')
+    ax2.set_ylabel('recall', color='r')
+    ax1.set_ylim([0,1])
+    ax1.set_ylim([0,1])
+    ax2.set_xlim([0,1])
+
+    name = model_name
+    plt.title(name)
+    if (output_type == 'save'):
+        plt.savefig(name)
+    elif (output_type == 'show'):
+        plt.show()
+    else:
+        plt.show()
+
+
+def joint_sort_descending(l1, l2):
+    '''
+    Sorts two numpy arrays
+
+    Source: Rayid Ghani
+        (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
+    '''
+    # l1 and l2 have to be numpy arrays
+    idx = np.argsort(l1)[::-1]
+    return l1[idx], l2[idx]
