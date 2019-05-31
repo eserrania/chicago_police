@@ -125,26 +125,25 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
     return officer_df
 
 
-def create_coaccusals_network(allegation_df, allegation_id, officer_id):
+def create_coaccusals_network(allegation_df):
     '''
     '''
     G = nx.Graph()
     
-    allegations = df[allegation_id]
+    allegations = allegation_df['crid']
     
     for aid in allegations.unique():
-        officers = df[df.allegation_id == aid]  
-        
+        officers = allegation_df[allegation_df.crid == aid]    
         if len(officers) > 1:
             oids = officers.officer_id
-            
+            n = 0
             for oid in oids:
-                for oid_2 in oids:
-                    if oid != oid_2:
+                for oid_2 in oids[n:]:
+                    if oid != oid_2: 
                         if (oid, oid_2) in G.edges():
                             G.edges[oid, oid_2]['count'] += 1
                             G.edges[oid, oid_2]['weight'] = 1 / G.edges[oid, oid_2]['count']
-
                         else: 
                             G.add_edge(oid, oid_2, count=1, weight=1)
+                n += 1
     return G
