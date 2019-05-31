@@ -22,7 +22,8 @@ def generate_features(officer_df, salary_df, allegation_df, end_date_train,
 def create_sustained_outcome(officer_df, allegation_df, end_date_train):
     '''
     Given the officers and merged allegation dfs, creates an outcome column
-    indicating whether or not the officer had a sustained investigation.
+    indicating whether or not the officer had a sustained investigation in the
+    outcome window.
     '''
     outcome_window = allegation_df.loc[
         allegation_df.incident_date > end_date_train]
@@ -30,6 +31,32 @@ def create_sustained_outcome(officer_df, allegation_df, end_date_train):
     officer_df['sustained_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(sustained.officer_id) else 0, axis=1)
     return officer_df
+
+def create_firearm_outcome(officer_df, trr, end_date_train):
+    '''
+    Given the officers and trr dfs, creates an outcome column
+    indicating whether or not the officer used a firearm in the
+    outcome window.
+    '''
+    outcome_window = trr.loc[
+        trr.trr_datetime > end_date_train]
+    firearm_trrs = outcome_window.loc[train_window.firearm_used]
+    officer_df['firearm_outcome'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
+    return officer_df
+
+def used_firearm(officer_df, trr, end_date_train):
+    '''
+    Dummy for identifying officers who used a firearm in the training
+    period.
+    '''
+    train_window = trr.loc[
+        trr.trr_datetime <= end_date_train]
+    firearm_trrs = train_window.loc[train_window.firearm_used]
+    officer_df['used_firearm'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
+    return officer_df
+
 
 def create_gender_dummy(officer_df):
     '''
@@ -125,25 +152,26 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
     return officer_df
 
 
-def create_coaccusals_network(allegation_df):
+def create_coaccusals_network(allegation_df, allegation_id, officer_id):
     '''
     '''
     G = nx.Graph()
     
-    allegations = allegation_df['crid']
+    allegations = df[allegation_id]
     
     for aid in allegations.unique():
-        officers = allegation_df[allegation_df.crid == aid]    
+        officers = df[df.allegation_id == aid]  
+        
         if len(officers) > 1:
             oids = officers.officer_id
-            n = 0
+            
             for oid in oids:
-                for oid_2 in oids[n:]:
-                    if oid != oid_2: 
+                for oid_2 in oids:
+                    if oid != oid_2:
                         if (oid, oid_2) in G.edges():
                             G.edges[oid, oid_2]['count'] += 1
                             G.edges[oid, oid_2]['weight'] = 1 / G.edges[oid, oid_2]['count']
+
                         else: 
                             G.add_edge(oid, oid_2, count=1, weight=1)
-                n += 1
     return G
