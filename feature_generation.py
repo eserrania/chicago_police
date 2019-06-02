@@ -22,8 +22,7 @@ def generate_features(officer_df, salary_df, allegation_df, end_date_train,
 def create_sustained_outcome(officer_df, allegation_df, end_date_train):
     '''
     Given the officers and merged allegation dfs, creates an outcome column
-    indicating whether or not the officer had a sustained investigation in the
-    outcome window.
+    indicating whether or not the officer had a sustained investigation.
     '''
     outcome_window = allegation_df.loc[
         allegation_df.incident_date > end_date_train]
@@ -31,32 +30,6 @@ def create_sustained_outcome(officer_df, allegation_df, end_date_train):
     officer_df['sustained_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(sustained.officer_id) else 0, axis=1)
     return officer_df
-
-def create_firearm_outcome(officer_df, trr, end_date_train):
-    '''
-    Given the officers and trr dfs, creates an outcome column
-    indicating whether or not the officer used a firearm in the
-    outcome window.
-    '''
-    outcome_window = trr.loc[
-        trr.trr_datetime > end_date_train]
-    firearm_trrs = outcome_window.loc[train_window.firearm_used]
-    officer_df['firearm_outcome'] = officer_df.apply(
-        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
-    return officer_df
-
-def used_firearm(officer_df, trr, end_date_train):
-    '''
-    Dummy for identifying officers who used a firearm in the training
-    period.
-    '''
-    train_window = trr.loc[
-        trr.trr_datetime <= end_date_train]
-    firearm_trrs = train_window.loc[train_window.firearm_used]
-    officer_df['used_firearm'] = officer_df.apply(
-        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
-    return officer_df
-
 
 def create_gender_dummy(officer_df):
     '''
@@ -161,40 +134,25 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
     return officer_df
 
 
-<<<<<<< HEAD
-def create_coaccusals_network(allegation_df, end_train_date):
-=======
-def create_coaccusals_network(allegation_df, allegation_id, officer_id):
->>>>>>> 615db95e2831700a4a50cbc345b9ce886515edce
+def create_coaccusals_network(allegation_df, end_date_train):
     '''
     '''
 
     G = nx.Graph()
     
-<<<<<<< HEAD
     allegations = allegation_df[allegation_df.incident_date \
-                                <= end_train_date].crid
+                                <= end_date_train].crid
 
-=======
-    allegations = df[allegation_id]
-    
->>>>>>> 615db95e2831700a4a50cbc345b9ce886515edce
     for aid in allegations.unique():
-        officers = df[df.allegation_id == aid]  
-        
+        officers = allegation_df[allegation_df.crid == aid]    
         if len(officers) > 1:
             oids = officers.officer_id
-            
+            n = 0
             for oid in oids:
-                for oid_2 in oids:
-                    if oid != oid_2:
+                for oid_2 in oids[n:]:
+                    if oid != oid_2: 
                         if (oid, oid_2) in G.edges():
                             G.edges[oid, oid_2]['count'] += 1
-                            G.edges[oid, oid_2]['weight'] = 1 / G.edges[oid, oid_2]['count']
-
-                        else: 
-                            G.add_edge(oid, oid_2, count=1, weight=1)
-    return G
                             G.edges[oid, oid_2]['weight'] = 1 / \
                                 G.edges[oid, oid_2]['count']
                         else: 
@@ -204,13 +162,13 @@ def create_coaccusals_network(allegation_df, allegation_id, officer_id):
 
 
 def add_investigators_network(network, investigators_df, allegation_df,
-                              end_train_date):
+                              end_date_train):
     '''
     '''
 
     investigators_df = investigators_df[investigators_df.officer_id.notnull()]
     allegations = allegation_df[allegation_df.incident_date \
-                                <= end_train_date].crid
+                                <= end_date_train].crid
 
     for aid in allegations.unique():
         investigator = investigators_df[investigators_df.allegation_id == aid]
@@ -230,10 +188,36 @@ def add_investigators_network(network, investigators_df, allegation_df,
 
     return network
 
-def add_same_unit_network(network, history_df, end_train_date):
+def create_firearm_outcome(officer_df, trr, end_date_train):
+    '''
+    Given the officers and trr dfs, creates an outcome column
+    indicating whether or not the officer used a firearm in the
+    outcome window.
+    '''
+    outcome_window = trr.loc[
+        trr.trr_datetime > end_date_train]
+    firearm_trrs = outcome_window.loc[train_window.firearm_used]
+    officer_df['firearm_outcome'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
+    return officer_df
+
+def used_firearm(officer_df, trr, end_date_train):
+    '''
+    Dummy for identifying officers who used a firearm in the training
+    period.
+    '''
+    train_window = trr.loc[
+        trr.trr_datetime <= end_date_train]
+    firearm_trrs = train_window.loc[train_window.firearm_used]
+    officer_df['used_firearm'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
+    return officer_df
+
+
+def add_same_unit_network(network, history_df, end_date_train):
     '''
     '''
-    history = history_df[history_df.effective_date <= end_train_date]
+    history = history_df[history_df.effective_date <= end_date_train]
 
     for unit in history_df.unit_id.unique():
         officers = history_df[history_df.unit_id == unit]
@@ -277,17 +261,14 @@ def add_same_unit_network(network, history_df, end_train_date):
             n += 1
 
     return network
-<<<<<<< HEAD
 
 
-def create_network(allegation_df, investigators_df, history_df, end_train_date):
+def create_network(allegation_df, investigators_df, history_df, end_date_train):
     '''
     '''
-    nw = create_coaccusals_network(allegation_df, end_train_date)
+    nw = create_coaccusals_network(allegation_df, end_date_train)
     nw = add_investigators_network(nw, investigators_df, allegation_df,
-                                   end_train_date)
-    nw = add_same_unit_network(nw, history_df, end_train_date)
+                                   end_date_train)
+    nw = add_same_unit_network(nw, history_df, end_date_train)
     return nw
 
-=======
->>>>>>> 615db95e2831700a4a50cbc345b9ce886515edce
