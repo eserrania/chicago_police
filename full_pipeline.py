@@ -58,6 +58,7 @@ class RawDfs:
 
 
 class TrainTest:
+    #NEED TO ADD METHODS FOR COMPARING REGULAR MODEL TO AUGMENTED MODEL
     def __init__(self, allegation_set, trr_set):
         self.allegation_set = allegation_set
         self.trr_set = trr_set
@@ -104,9 +105,13 @@ class TrainTest:
         self.officer_test = self.officer_test.dropna()
 
     def run_loop(self):
+        #UPDATE THIS PART LATER TO BE MORE EFFICIENT
+        time_splits = self.allegation_set
+        time_splits['train'] = self.officer_train
+        time_splits['test'] = self.officer_test
         self.output_df = ml.classifier_loop(
-            [self.allegation_set], self.grid, self.clfs, self.metric_dict, self.label,
-            preds_drop, self.metrics, plot=True, save=False)
+            [time_splits], self.grid, self.clfs, self.metric_dict, self.label,
+            ['appointed_date', 'resignation_date'], self.metrics, plot=True, save=False)
 
 
 
