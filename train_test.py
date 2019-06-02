@@ -56,8 +56,7 @@ def split_sets(df, outcome_time, date_col, start_date='01-01-2010',
                         str(end_date_outcome + np.timedelta64(1,'D'))[:10],
                         str(end_date_test)[:10]))
             train_df = df.loc[df[date_col] <= end_date_outcome]
-            test_df = df.loc[(df[date_col] > end_date_outcome) & \
-                (df[date_col] <= end_date_test)]
+            test_df = df.loc[df[date_col] <= end_date_test]
             set_dict = {"train": train_df, "test": test_df,
                 "start_date_train": start_date_train,
                 "end_date_train": end_date_train,
