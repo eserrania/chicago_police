@@ -97,7 +97,7 @@ def create_tenure_dummies(officer_df, end_date_train, bins=4):
         creates dummies for each age range.
     '''
     officer_df['tenure'] = [math.floor(((end_date_train - date).days) / 365.25) 
-                            for date in officers.appointed_date]
+                            for date in officer_df.appointed_date]
     officer_df['tenure'] = pd.cut(officer_df.tenure, bins)
     officer_df = pd.get_dummies(officer_df, columns=['tenure'])
     return officer_df
@@ -161,13 +161,24 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
     return officer_df
 
 
+<<<<<<< HEAD
+def create_coaccusals_network(allegation_df, end_train_date):
+=======
 def create_coaccusals_network(allegation_df, allegation_id, officer_id):
+>>>>>>> 615db95e2831700a4a50cbc345b9ce886515edce
     '''
     '''
+
     G = nx.Graph()
     
+<<<<<<< HEAD
+    allegations = allegation_df[allegation_df.incident_date \
+                                <= end_train_date].crid
+
+=======
     allegations = df[allegation_id]
     
+>>>>>>> 615db95e2831700a4a50cbc345b9ce886515edce
     for aid in allegations.unique():
         officers = df[df.allegation_id == aid]  
         
@@ -192,13 +203,14 @@ def create_coaccusals_network(allegation_df, allegation_id, officer_id):
     return G
 
 
-def add_investigators_network(network, investigators_df, allegation_df):
+def add_investigators_network(network, investigators_df, allegation_df,
+                              end_train_date):
     '''
     '''
 
     investigators_df = investigators_df[investigators_df.officer_id.notnull()]
-
-    allegations = allegation_df['crid']
+    allegations = allegation_df[allegation_df.incident_date \
+                                <= end_train_date].crid
 
     for aid in allegations.unique():
         investigator = investigators_df[investigators_df.allegation_id == aid]
@@ -218,14 +230,13 @@ def add_investigators_network(network, investigators_df, allegation_df):
 
     return network
 
-def add_same_unit_network(network, officer_history_df, officer_df):
+def add_same_unit_network(network, history_df, end_train_date):
     '''
     '''
-    history = officer_history_df[officer_history_df.\
-        officer_id.isin(officer_df.id.unique())]
+    history = history_df[history_df.effective_date <= end_train_date]
 
-    for unit in history.unit_id.unique():
-        officers = history[history.unit_id == unit]
+    for unit in history_df.unit_id.unique():
+        officers = history_df[history_df.unit_id == unit]
         oids = officers.officer_id
         n = 0
         for oid in oids:
@@ -239,7 +250,7 @@ def add_same_unit_network(network, officer_history_df, officer_df):
                         end_date2 = officers[officers.officer_id == oid_2]\
                             .end_date.iloc[0]
 
-                        if not(end_date2 < end_date):
+                        if not(end_date2 < start_date):
                             if (oid, oid_2) in network.edges():
                                 network.edges[oid, oid_2]['count'] += 1
                                 network.edges[oid, oid_2]['weight'] = 1 / \
@@ -266,3 +277,17 @@ def add_same_unit_network(network, officer_history_df, officer_df):
             n += 1
 
     return network
+<<<<<<< HEAD
+
+
+def create_network(allegation_df, investigators_df, history_df, end_train_date):
+    '''
+    '''
+    nw = create_coaccusals_network(allegation_df, end_train_date)
+    nw = add_investigators_network(nw, investigators_df, allegation_df,
+                                   end_train_date)
+    nw = add_same_unit_network(nw, history_df, end_train_date)
+    return nw
+
+=======
+>>>>>>> 615db95e2831700a4a50cbc345b9ce886515edce
