@@ -172,7 +172,36 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                              'officer_unit_id': 'str',
                                              'officer_unit_detail_id': 'str',
                                              'point': 'str'},
-                            'date_cols': ['trr_datetime']}}
+                            'date_cols': ['trr_datetime']},
+                'investigator': {'use_cols': ['id', 'appointed_date',
+                                             'first_name', 'last_name',
+                                             'middle_initial', 'officer_id',
+                                             'suffix_name', 'gender', 'race'],
+                                'data_types': {'id': 'str',
+                                               'appointed_date': 'str',
+                                               'first_name': 'str',
+                                               'last_name': 'str',
+                                               'middle_initial': 'str',
+                                               'officer_id': 'str',
+                                               'suffix_name': 'str',
+                                               'gender': 'str',
+                                               'race': 'str'},
+                                'date_cols': ['appointed_date']},
+                'investigatorallegation': {'use_cols': ['id', 'current_star',
+                                                        'current_rank',
+                                                        'current_unit_id',
+                                                        'investigator_id',
+                                                        'investigator_type',
+                                                        'allegation_id'],
+                                            'data_types': {'id': 'str',
+                                                           'current_star': 'str',
+                                                           'current_rank': 'str',
+                                                           'current_unit_id': 'str',
+                                                           'investigator_id': 'str',
+                                                           'investigator_type': 'str',
+                                                           'allegation_id': 'str'},
+                                            'date_cols': []}
+                }
 
 ###############################################################################
 # Functions (cleaning and raw data exploration)
@@ -212,3 +241,14 @@ def create_df(name):
     except Exception as e:
         print("ERROR:", e)
         #print("ERROR: allowed names are {}".format(allowed_names))
+
+def merge_data(allegation_df, officerallegation_df, investigator_df,
+               investigatorallegation_df):
+    '''
+    Merge allegation with officer allegation data and investigator with
+    investigator allegation.
+    '''
+    allegationm_df = allegation_df.merge(officerallegation_df, left_on='crid', right_on='allegation_id')
+    investigatorm_df = investigator_df.merge(investigatorallegation_df, left_on='id', right_on='investigator_id')
+
+    return (allegationm_df, investigatorm_df)
