@@ -70,4 +70,3 @@ def split_sets(df, outcome_time, date_col, start_date='01-01-2010',
             count += 1
         print()
     return set_list
-
