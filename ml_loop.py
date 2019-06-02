@@ -38,39 +38,23 @@ SEED = 84
 # ML loop
 ################################################################################
 
-def classifier_loop(df, grid, clfrs_to_run, metric_dict, start_date, outcome_time,
-    date_col, label, split_length, na_lst, quant_lst, disc_lst,
-    cols_to_keep, feature_lst, preds_drop, metrics, plot=False, save=False):
+def classifier_loop(temp_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
+                    metrics, plot=False, save=False):
     '''
     Loops through the classifiers, parameters and train-test pairs and saves
     the results into a pandas dataframe.
 
     Inputs:
-        - df (pandas dataframe): a dataframe
+        - temp_lst (lst): list of temporal splits
         - grid (dict): a parameter grid
         - clfrs_to_run (dict): chosen classifiers to be ran
         - metric_dict (dict): dictionary of metrics with threshold lists
-        - start_date (str): start date for data (mm/dd/yy)
-        - outcome_time (int): target number of days after which to intervene on
-            non-funded projects
-        - date_col (str): date column
         - label (str): name of label column
-        - split_length (str): frequency to split on ('6MS', '6M' ...)
-        - na_lst (lst): list of tuples, where each tuple contains the variable
-            to be imputed and the variable to impute the mean by
-        - quant_lst (lst): list of columns names that will be converted into
-            frequency quantiles to reduce their dimensionality
-        - disc_lst (lst): list of tuples, where each tuple contains the column
-            to be discretized and the number of categories
-        - cols_to_keep (lst): list of columns that will be kept in the model
-        - feature_lst (lst): list of columns that need to be converted into dummies
         - preds_drop (lst): list of columns that need to be dropped before
             classification
         - metrics (str): choose to get population or regular metrics
-        - out_type (str): 'analysis' for assignment metrics, 'top_5' for
-            targeted k
+        - plot (bool): plots precision recall curve if set to true
         - save (bool): saves output df into csv if set to true
-        - plt (bool): plots precision recall curve if set to true
 
     Returns a pandas dataframe with the looping results
 
@@ -81,10 +65,7 @@ def classifier_loop(df, grid, clfrs_to_run, metric_dict, start_date, outcome_tim
     clfrs, params = define_ml_models(grid, clfrs_to_run)
     # create output dataframe
     output_df = create_output_df(metric_dict)
-    # calls split datasets that impute and create dummies locally
-    temp_lst = temporal_split(df, start_date, outcome_time, date_col, split_length,
-                       na_lst, quant_lst, disc_lst, cols_to_keep,
-                       feature_lst)
+
     #loops through classifier dictionary
     for name, clfr in clfrs.items():
         param_vals = params[name]
@@ -101,6 +82,8 @@ def classifier_loop(df, grid, clfrs_to_run, metric_dict, start_date, outcome_tim
                 train_end = time_dict['end_date_train']
                 test_start = time_dict['start_date_test']
                 test_end = time_dict['end_date_test']
+
+                print(sum(train.sustained_outcome), sum(test.sustained_outcome))
 
                 # instantiate classifier
                 cl = clfr.set_params(**p)
@@ -132,7 +115,7 @@ def classifier_loop(df, grid, clfrs_to_run, metric_dict, start_date, outcome_tim
                     plot_precision_recall_n(y_test, pred_probs, name, plot)
 
     if save:
-    output_df.to_csv(file_name)
+        output_df.to_csv(file_name)
 
     return output_df
 

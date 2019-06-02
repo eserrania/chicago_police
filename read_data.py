@@ -200,7 +200,16 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                                            'investigator_id': 'str',
                                                            'investigator_type': 'str',
                                                            'allegation_id': 'str'},
-                                            'date_cols': []}
+                                            'date_cols': []},
+                'officerhistory': {'use_cols': ['id', 'effective_date',
+                                                'end_date', 'officer_id',
+                                                'unit_id'],
+                                    'data_types': {'id': 'str',
+                                                   'effective_date': 'str',
+                                                   'end_date': 'str',
+                                                   'officer_id': 'str',
+                                                   'unit_id': 'str'},
+                                    'date_cols': ['effective_date', 'end_date']}
                 }
 
 ###############################################################################
