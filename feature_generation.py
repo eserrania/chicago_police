@@ -84,7 +84,8 @@ def create_age_dummies(officer_df, end_date_train, bins=4):
         creates dummies for each age range.
     '''
             
-    officer_df['age'] = pd.cut(end_date_train.year - officer_df.birth_year, bins)
+    officer_df['age'] = pd.cut(end_date_train.year - officer_df.birth_year,
+                               bins)
     officer_df = pd.get_dummies(officer_df, columns=['age'])
     return officer_df
 
@@ -109,10 +110,13 @@ def create_rank_dummies(officer_df, salary_df, end_date_train, bins=4):
         that time.
     '''
     officer_df = officer_df.drop(columns=['rank'])
-    salary_df = salary_df[[ryear <= end_date_train.year for ryear in salary_df.year]]
-    salary_df = salary_df[[date <= end_date_train for date in salary_df.spp_date]]
+    salary_df = salary_df[[ryear <= end_date_train.year 
+                           for ryear in salary_df.year]]
+    salary_df = salary_df[[date <= end_date_train 
+                           for date in salary_df.spp_date]]
     current_ranks = salary_df.groupby('officer_id')['year'].max().to_frame()
-    current_ranks = current_ranks.merge(salary_df[['officer_id', 'rank', 'year']],
+    current_ranks = current_ranks.merge(salary_df[['officer_id', 'rank',
+                                                   'year']],
                                         on=['officer_id', 'year'], how='left')
     officer_df = officer_df.merge(current_ranks, how='left', left_on='id',
                                   right_on='officer_id')
@@ -129,12 +133,15 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
     '''
     
     allegation_df = allegation_df[allegation_df.incident_date < end_date_train]
-    allegation_df = allegation_df[allegation_df['officer_id'].isin(officer_df.id.unique())]
+    allegation_df = allegation_df[allegation_df['officer_id']\
+        .isin(officer_df.id.unique())]
     officer_df['number_complaints'] = 0
     officer_df['pct_officer_complaints'] = 0.0
     officer_df['pct_sustained_complaints'] = 0.0
-    off_complaints = allegation_df[allegation_df.is_officer_complaint == True].officer_id.value_counts()  
-    sustained = allegation_df[allegation_df.final_finding == 'SU'].officer_id.value_counts()
+    off_complaints = allegation_df[allegation_df.is_officer_complaint == True]\
+        .officer_id.value_counts()  
+    sustained = allegation_df[allegation_df.final_finding == 'SU'].officer_id\
+        .value_counts()
     count = allegation_df.officer_id.value_counts()
     
     
@@ -142,10 +149,12 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
         officer_df.loc[officer_df.id == oid, 'number_complaints'] = count[oid]
         
         if oid in off_complaints.index:
-            officer_df.loc[officer_df.id == oid, 'pct_officer_complaints'] = off_complaints[oid] / count[oid]
+            officer_df.loc[officer_df.id == oid, 'pct_officer_complaints'] = \
+            off_complaints[oid] / count[oid]
         
         if oid in sustained.index:
-            officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = sustained[oid] / count[oid]
+            officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = \
+            sustained[oid] / count[oid]
 
     #internal_allegation_percentile
     
@@ -175,3 +184,85 @@ def create_coaccusals_network(allegation_df, allegation_id, officer_id):
                         else: 
                             G.add_edge(oid, oid_2, count=1, weight=1)
     return G
+                            G.edges[oid, oid_2]['weight'] = 1 / \
+                                G.edges[oid, oid_2]['count']
+                        else: 
+                            G.add_edge(oid, oid_2, count=1, weight=1)
+                n += 1
+    return G
+
+
+def add_investigators_network(network, investigators_df, allegation_df):
+    '''
+    '''
+
+    investigators_df = investigators_df[investigators_df.officer_id.notnull()]
+
+    allegations = allegation_df['crid']
+
+    for aid in allegations.unique():
+        investigator = investigators_df[investigators_df.allegation_id == aid]
+        officers = allegation_df[allegation_df.crid == aid] 
+        if (len(investigator) > 0) & (len(officers) > 0):
+            inv_id = investigator.investigator_id
+            off_id = officers.officer_id
+
+            for iid in inv_id:
+                for oid in off_id:
+                    if (iid, oid) in network.edges():
+                        network.edges[iid, oid]['count'] += 1
+                        network.edges[iid, oid]['weight'] = 1 / \
+                            network.edges[iid, oid]['count']
+                    else:
+                        network.add_edge(iid, oid, count=1, weight=1)
+
+    return network
+
+def add_same_unit_network(network, officer_history_df, officer_df):
+    '''
+    '''
+    history = officer_history_df[officer_history_df.\
+        officer_id.isin(officer_df.id.unique())]
+
+    for unit in history.unit_id.unique():
+        officers = history[history.unit_id == unit]
+        oids = officers.officer_id
+        n = 0
+        for oid in oids:
+            start_date = officers[officers.officer_id == oid]\
+                .effective_date.iloc[0] 
+            end_date = officers[officers.officer_id == oid].end_date.iloc[0]
+
+            for oid_2 in oids[n:]:
+                if oid != oid_2:
+                    if type(end_date) is pd._libs.tslibs.nattype.NaTType:
+                        end_date2 = officers[officers.officer_id == oid_2]\
+                            .end_date.iloc[0]
+
+                        if not(end_date2 < end_date):
+                            if (oid, oid_2) in network.edges():
+                                network.edges[oid, oid_2]['count'] += 1
+                                network.edges[oid, oid_2]['weight'] = 1 / \
+                                network.edges[oid, oid_2]['count']
+
+                            else: 
+                                network.add_edge(oid, oid_2, count=1, weight=1)
+
+                    else:
+                        start_date2 = officers[officers.officer_id == oid_2]\
+                            .effective_date.iloc[0] 
+                        end_date2 = officers[officers.officer_id == oid_2]\
+                            .end_date.iloc[0]
+
+                        if not ((start_date2 > end_date) | \
+                            (end_date2 < start_date)):
+                            if (oid, oid_2) in network.edges():
+                                network.edges[oid, oid_2]['count'] += 1
+                                network.edges[oid, oid_2]['weight'] = 1 / \
+                                network.edges[oid, oid_2]['count']
+
+                            else: 
+                                network.add_edge(oid, oid_2, count=1, weight=1)
+            n += 1
+
+    return network
