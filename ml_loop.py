@@ -38,7 +38,7 @@ SEED = 84
 # ML loop
 ################################################################################
 
-def classifier_loop(temp_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
+def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
                     metrics, plot=False, save=False):
     '''
     Loops through the classifiers, parameters and train-test pairs and saves
@@ -74,8 +74,8 @@ def classifier_loop(temp_lst, grid, clfrs_to_run, metric_dict, label, preds_drop
             #print(p)
             # loop through TrainTest object list
             for obj in set_lst:
-                type_lst = [obj.reg, obj.aug]
-                for type in type_lst:
+                set_lst = [obj.reg, obj.aug]
+                for set in set_lst:
                     print('****')
                     # get data from dictionary
                     train = type['train']
