@@ -72,47 +72,47 @@ def classifier_loop(temp_lst, grid, clfrs_to_run, metric_dict, label, preds_drop
         # unpack the list of parameters and then run loop on combination
         for p in ParameterGrid(param_vals):
             #print(p)
-            # loop through split data/training sets
-            for set, time_dict in enumerate(temp_lst):
-                print('*****************')
-                # get data from dictionary
-                train = time_dict['train']
-                test = time_dict['test']
-                train_start = time_dict['start_date_train']
-                train_end = time_dict['end_date_train']
-                test_start = time_dict['start_date_test']
-                test_end = time_dict['end_date_test']
+            # loop through TrainTest object list
+            for obj in set_lst:
+                type_lst = [obj.reg, obj.aug]
+                for type in type_lst:
+                    print('****')
+                    # get data from dictionary
+                    train = type['train']
+                    test = type['test']
+                    train_start = obj.start_date_train
+                    train_end = obj.end_date_train
+                    test_start = obj.start_date_test
+                    test_end = obj.end_date_test
 
-                print(sum(train.sustained_outcome), sum(test.sustained_outcome))
+                    # instantiate classifier
+                    cl = clfr.set_params(**p)
 
-                # instantiate classifier
-                cl = clfr.set_params(**p)
+                    print('** Working on the {} classifier {} with parameters {}.'.format(
+                          name, clfr, p))
+                    print('* Training from {} to {} and testing from {} to {}.'.format(
+                          train_start, train_end, test_start, test_end))
 
-                print('** Working on the {} classifier {} with parameters {}.'.format(
-                      name, clfr, p))
-                print('* Training from {} to {} and testing from {} to {}.'.format(
-                      train_start, train_end, test_start, test_end))
+                    # separate into train, test
+                    X_train = train.drop(columns=preds_drop)
+                    y_train = train[label]
+                    X_test = test.drop(columns=preds_drop)
+                    y_test = test[label]
 
-                # separate into train, test
-                X_train = train.drop(columns=preds_drop)
-                y_train = train[label]
-                X_test = test.drop(columns=preds_drop)
-                y_test = test[label]
+                    cl.fit(X_train, y_train)
 
-                cl.fit(X_train, y_train)
+                    if name == 'SVM':
+                        pred_probs = cl.decision_function(X_test)
+                    else:
+                        pred_probs = cl.predict_proba(X_test)[:, 1]
 
-                if name == 'SVM':
-                    pred_probs = cl.decision_function(X_test)
-                else:
-                    pred_probs = cl.predict_proba(X_test)[:, 1]
-
-                importances = cl.feature_importances_
-                # update metric dataframe
-                update_metrics_df(output_df, y_test, pred_probs, name, importances,
-                                  p, set, train_start, train_end,
-                                  test_start, test_end, metrics)
-                if plot:
-                    plot_precision_recall_n(y_test, pred_probs, name, plot)
+                    importances = cl.feature_importances_
+                    # update metric dataframe
+                    update_metrics_df(output_df, y_test, pred_probs, name, importances,
+                                      p, set, train_start, train_end,
+                                      test_start, test_end, metrics)
+                    if plot:
+                        plot_precision_recall_n(y_test, pred_probs, name, plot)
 
     if save:
         output_df.to_csv(file_name)
