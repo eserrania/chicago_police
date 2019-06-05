@@ -192,38 +192,50 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
     officer_df['white_count'] = 0
     officer_df['api_count'] = 0
     officer_df['hispanic_count'] = 0
+    officer_df['pct_white_victims'] = 0.0
+    officer_df['pct_black_victims'] = 0.0
+    officer_df['pct_api_victims'] = 0.0
+    officer_df['pct_hispanic_victims'] = 0.0
 
     allegs = allegation_df[allegation_df.officer_id.isin(officer_df.id)].crid
-    len(allegs)
     victim_filter = victim_df[victim_df.allegation_id.isin(allegs)]
-    len(victim_filter)
 
     for aid in victim_filter.allegation_id.unique():
         victims = victim_filter[victim_filter.allegation_id == aid]
 
         cnt = len(victims)
         if cnt > 0:
-            #print(cnt)
             white = len(victims[victims.race == 'White'])
             black = len(victims[victims.race == 'Black'])
             hisp = len(victims[victims.race == 'Hispanic'])
             api = len(victims[victims.race == 'Asian/Pacific Islander'])
             officers = allegation_df[allegation_df.crid == aid].officer_id
             officer_df.loc[officer_df.id.isin(officers), 'victim_count'] += cnt
-            officer_df.loc[officer_df.id.isin(officers), 'white_count'] += white
-            officer_df.loc[officer_df.id.isin(officers), 'black_count'] += black
+            officer_df.loc[officer_df.id.isin(officers), 'white_count'] += \
+                white
+            officer_df.loc[officer_df.id.isin(officers), 'black_count'] += \
+                black
             officer_df.loc[officer_df.id.isin(officers), 'api_count'] += api
-            officer_df.loc[officer_df.id.isin(officers), 'hispanic_count'] += hisp
+            officer_df.loc[officer_df.id.isin(officers), 'hispanic_count'] += \
+                hisp
 
+    have_victims = officer_df.victim_count > 0
+    officer_df.loc[have_victims, 'pct_white_victims'] = \
+        officer_df[have_victims].white_count /\
+        officer_df[have_victims].victim_count
 
-    officer_df['pct_white_victims'] = officer_df.white_count / \
-        officer_df.victim_count
-    officer_df['pct_black_victims'] = officer_df.black_count / \
-        officer_df.victim_count
-    officer_df['pct_api_victims'] = officer_df.api_count / \
-        officer_df.victim_count
-    officer_df['pct_hispanic_victims'] = officer_df.hispanic_count / \
-        officer_df.victim_count
+    officer_df.loc[have_victims, 'pct_black_victims'] = \
+        officer_df[have_victims].black_count /\
+        officer_df[have_victims].victim_count
+
+    officer_df.loc[have_victims, 'pct_api_victims'] = \
+        officer_df[have_victims].api_count /\
+        officer_df[have_victims].victim_count
+
+    officer_df.loc[have_victims0, 'pct_hispanic_victims'] = \
+        officer_df[have_victims].hispanic_count /\
+        officer_df[have_victims].victim_count
+
 
     officer_df.drop(columns=['black_count', 'white_count', 'api_count',
                              'hispanic_count'], inplace=True)
