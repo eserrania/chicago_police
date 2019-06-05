@@ -1,6 +1,7 @@
 '''
 Machine learning functions
 '''
+from __future__ import division
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier
 from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix, accuracy_score
 from sklearn.model_selection import train_test_split, cross_validate, GridSearchCV, ParameterGrid
@@ -11,7 +12,6 @@ from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import *
-from __future__ import division
 import pandas as pd
 import numpy as np
 import os
@@ -229,7 +229,7 @@ def create_output_df(metric_dict):
     '''
 
     # minimum columns for output dataframe
-    col_lst = ['model', 'importances', 'parameters', 'set', 't', 'train_start', 'train_end',
+    col_lst = ['model', 'importances', 'parameters', 'set', 'type', 'outcome' 'train_start', 'train_end',
                'test_start', 'test_end']
     # dealing with evaluation metrics
     for metric, threshold_lst in metric_dict.items():
