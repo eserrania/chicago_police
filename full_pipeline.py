@@ -39,9 +39,9 @@ class RawDfs:
 
     def create_train_tests(self, outcome_time):
         self.train_test(outcome_time)
-        set_count = min(len(self.allegation_sets, self.trr_sets))
+        set_count = min(len(self.allegation_sets), len(self.trr_sets))
         set_list = []
-        for i in set_count:
+        for i in range(set_count):
             set_list.append(
                 TrainTest(self.allegation_sets[i],
                     self.trr_sets[i]))
@@ -52,8 +52,6 @@ class TrainTest:
     def __init__(self, allegation_set, trr_set):
         self.allegation_set = allegation_set
         self.trr_set = trr_set
-        self.investigator_set = investigator_set
-        self.salary_set = salary_set
         self.officer_df = rd.create_df('officer')
         self.reg = {'train': self.officer_df.loc[(
             self.officer_df.appointed_date < trr_set.get('start_date_outcome'))\
@@ -75,6 +73,7 @@ class TrainTest:
         self.end_date_train = allegation_set.get('end_date_train')
         self.start_date_outcome = allegation_set.get('start_date_outcome')
         self.end_date_outcome = allegation_set.get('end_date_outcome')
+        self.start_date_test = allegation_set.get('start_date_test')
         self.end_date_test = allegation_set.get('end_date_test')
 
 

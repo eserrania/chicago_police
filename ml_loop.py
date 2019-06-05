@@ -73,7 +73,7 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
         for p in ParameterGrid(param_vals):
             #print(p)
             # loop through TrainTest object list
-            for set, obj in set_lst:
+            for st, obj in enumerate(set_lst):
                 reg_aug_dict = {'regular': obj.reg, 'augmented': obj.aug}
                 for ra, dict in reg_aug_dict.items():
                     print('****')
@@ -109,7 +109,7 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
                     importances = cl.feature_importances_
                     # update metric dataframe
                     update_metrics_df(output_df, y_test, pred_probs, name, importances,
-                                      p, set, ra, train_start, train_end,
+                                      p, st, ra, train_start, train_end,
                                       test_start, test_end, metrics)
                     if plot:
                         plot_precision_recall_n(y_test, pred_probs, name, plot)
@@ -239,7 +239,7 @@ def create_output_df(metric_dict):
 
     return output_df
 
-def update_metrics_df(output_df, y_test, pred_probs, name, importances, parameters, set, ra,
+def update_metrics_df(output_df, y_test, pred_probs, name, importances, parameters, st, ra,
                       train_start, train_end, test_start, test_end, metrics):
     '''
     Updates metrics dataframe
@@ -250,7 +250,7 @@ def update_metrics_df(output_df, y_test, pred_probs, name, importances, paramete
         - pred_probs:
     '''
     # minimum columns to identify model
-    result_lst = [name, importances, parameters, set, ra, train_start, train_end,
+    result_lst = [name, importances, parameters, st, ra, train_start, train_end,
                   test_start, test_end]
 
     # list of columns to fill in metrics for
