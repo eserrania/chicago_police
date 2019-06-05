@@ -6,37 +6,67 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from statistics import mode
 
-def generate_features(officer_df, allegation_df, trr_df, end_date_set,
-                      train_test='train', feat_dict=None, augmented=False):
+def generate_features(officer_df, allegation_df, trr_df, victim_df,
+                      end_date_set, train_test='train', feat_dict=None):
     '''
 
     '''
 
     officer_df = create_sustained_outcome(officer_df, allegation_df,
                                           end_date_set)
+    print('sustained done')
     officer_df = create_gender_dummy(officer_df)
+    print('gender done')
     officer_df = used_firearm(officer_df, trr_df, end_date_set)
+    print('firearm done')
     officers_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
+    print('firearm outcome done')
 
 
+
+    network =  create_coaccusals_network(allegation_df, end_date_set)
+    print('network done')
 
     if train_test == 'train':
-        features = ['gender', 'tenure', 'number_complaints',
+        features = ['gender', 'age', 'tenure', 'number_complaints',
                     'pct_officer_complaints', 'pct_sustained_complaints']
         feat_dict = {}
 
         officer_df, feat_dict, newvars = create_race_dummies(officer_df,
                                                              feat_dict)
+        print('race done')
         features += newvars
 
         officer_df, feat_dict = create_age_var(officer_df, end_date_set,
                                                feat_dict)
+        print('age_done')
 
-        officer_df, feat_dict = create_tenure_var(officer_df, end_date_set
+        officer_df, feat_dict = create_tenure_var(officer_df, end_date_set,
                                                   feat_dict)
-        officer_df, feat_dict = gen_allegation_features(officer_df,
-                                                        allegation_df,
-                                                        end_date_set, feat_dict)
+        print('tenure done')
+        #officer_df, feat_dict = gen_allegation_features(officer_df,
+        #                                                allegation_df,
+        #                                                end_date_set, feat_dict)
+        print('allegations done')
+
+        #officer_df, feat_dict, newvars = gen_victim_features(officer_df,
+        #                                                     allegation_df,
+        #                                                     victim_df,
+        #                                                     feat_dict)
+        print('victims done')
+
+        features += newvars
+
+
+        officer_df, feat_dict, newvars = gen_network_features(officer_df,
+                                                              network, 
+                                                              feat_dict)
+        print('network 2 done')
+        features_aug = features[:] + newvars
+
+        return officer_df, feat_dict, features, features_aug
+
+
 
     if train_test == 'test':
         officer_df = create_race_dummies(officer_df, feat_dict, train=False)
@@ -47,27 +77,12 @@ def generate_features(officer_df, allegation_df, trr_df, end_date_set,
         officer_df = gen_allegation_features(officer_df, allegation_df,
                                              end_date_set, feat_dict,
                                              train=False)
-
-
-
-    if augmented:
-        network =  create_coaccusals_network(allegation_df, end_date_set)
-        if train_test == 'train':
-            officer_df, feat_dict, newvars = gen_network_features(officer_df,
-                                                                  network,
-                                                                  feat_dict)
-
-            features += newvars
-
-        if train_test == 'test':
-            officer_df = gen_network_features(officer_df, network, feat_dict,
-                                              train=False)
-
-    if train_test == 'train':
-        return officer_df, feat_dict, features
-
-    if train_test == 'test':
+        officer_df = gen_victim_features(officer_df, allegation_df, victim_df,
+                                         feat_dict, train=False)
+        officer_df = gen_network_features(officer_df, network, feat_dict, 
+                                          train=False)
         return officer_df
+
 
 def create_sustained_outcome(officer_df, allegation_df, end_date_set):
     '''
@@ -85,7 +100,7 @@ def create_gender_dummy(officer_df):
     '''
     Given the officers dataframe, convert the gender variable into a dummy.
     '''
-    officer_df = officer_df.fillna(value={gender: mode(officer_df.gender)})
+    officer_df = officer_df.fillna(value={'gender': mode(officer_df.gender)})
     officer_df['gender'] = np.where(officer_df.gender == 'F', 1 , 0)
 
     return officer_df
@@ -100,7 +115,7 @@ def create_race_dummies(officer_df, feat_dict, train=True):
                        for race in officer_df.race]
     if train:
         newvars = []
-        values = officer.race.unique()
+        values = officer_df.race.unique()
         feat_dict['race'] = values
         officer_df = pd.get_dummies(officer_df, columns=['race'])
         for val in values:
@@ -148,7 +163,7 @@ def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
     Given the officers dataframe and the end date of the training data set,
         calculates the officer´s tenure at that timee and scales it.
     '''
-    officer_df['tenure'] = [math.floor(((end_date_set - date).days) / 365.25)
+    officer_df['tenure'] = [end_date_set.year - date.year
                             for date in officer_df.appointed_date]
     officer_df = officer_df.fillna(value={'tenure': np.mean(officer_df.tenure)})
 
@@ -166,6 +181,66 @@ def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
             np.array(officer_df['tenure']).reshape(-1, 1))
 
         return officer_df
+
+
+def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
+                        train=True):
+    '''
+    '''
+    officer_df['victim_count'] = 0
+    officer_df['black_count'] = 0
+    officer_df['white_count'] = 0
+    officer_df['api_count'] = 0
+    officer_df['hispanic_count'] = 0
+
+
+
+    for aid in victim_df.allegation_id.unique():
+        victims = victim_df[victim_df.allegation_id == aid]
+
+        cnt = len(victims)
+        white = len(victims[victims.race == 'White'])
+        black = len(victims[victims.race == 'Black'])
+        hisp = len(victims[victims.race == 'Hispanic'])
+        api = len(victims[victims.race == 'Asian/Pacific Islander'])
+
+        officers = allegation_df[allegation_df.crid == aid].officer_id
+        officer_df.loc[officer_df.id.isin(officers), 'victim_count'] += victims
+        officer_df.loc[officer_df.id.isin(officers), 'white_count'] += white
+        officer_df.loc[officer_df.id.isin(officers), 'black_count'] += black
+        officer_df.loc[officer_df.id.isin(officers), 'api_count'] += api
+        officer_df.loc[officer_df.id.isin(officers), 'hispanic_count'] += hisp
+
+
+    officer_df['pct_white_victims'] = officer_df.white_count / \
+        officer_df.victim_count
+    officer_df['pct_black_victims'] = officer_df.black_count / \
+        officer_df.victim_count
+    officer_df['pct_api_victims'] = officer_df.api_count / \
+        officer_df.victim_count
+    officer_df['pct_hispanic_victims'] = officer_df.hispanic_count / \
+        officer_df.victim_count
+
+    officer.drop(columns=['black_count', 'white_count', 'api_count',
+                          'hispanic_count'], inplace=True)
+
+    if train:
+        scaler = MinMaxScaler()
+        officer_df['victim_count'] = scaler.fit_transform(\
+            np.array(officer_df['victim_count']).reshape(-1, 1))
+        feat_dict['victim_count'] = scaler
+
+        return officer_df, feat_dict, ['victim_count', 'pct_white_victims',
+                                        'pct_black_victims', 'pct_api_victims',
+                                        'pct_hispanic_victims']
+
+    else:
+        scaler = feat_dict['victim_count']
+        officer_df['victim_count'] = scaler.transform(\
+            np.array(officer_df['victim_count']).reshape(-1, 1))
+
+        return officer_df
+
 
 '''
 def create_rank_dummies(officer_df, salary_df, end_date_set):
@@ -300,7 +375,7 @@ def create_firearm_outcome(officer_df, trr, end_date_set):
     '''
     outcome_window = trr.loc[
         trr.trr_datetime > end_date_set]
-    firearm_trrs = outcome_window.loc[train_window.firearm_used]
+    firearm_trrs = outcome_window.loc[outcome_window.firearm_used]
     officer_df['firearm_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
     return officer_df
@@ -470,17 +545,18 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
         feat_dict['shortest_path_shooting_officer'] = values_1
         feat_dict['shortest_path_sustained_officer'] = values_2
 
-        officer_df = pd.get_dummies(officer_df,
-                                    columns=['shortest_path_shooting_officer',
-                                             'shortest_path_sustained_officer'])
-        for val in officer.shortest_path_shooting_officer.unique():
+
+        for val in officer_df['shortest_path_shooting_officer'].unique():
             varname = 'shortest_path_shooting_officer_{}'.format(val)
             newvars.append(varname)
 
-        for val in officer.shortest_path_sustained_officer.unique():
+        for val in officer_df['shortest_path_sustained_officer'].unique():
             varname = 'shortest_path_sustained_officer_{}'.format(val)
             newvars.append(varname)
 
+        officer_df = pd.get_dummies(officer_df,
+                                    columns=['shortest_path_shooting_officer',
+                                             'shortest_path_sustained_officer'])
 
         scaler_1 = MinMaxScaler()
         scaler_2 = MinMaxScaler()
