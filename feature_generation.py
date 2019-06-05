@@ -49,10 +49,10 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
         #                                                end_date_set, feat_dict)
         print('allegations done')
 
-        #officer_df, feat_dict, newvars = gen_victim_features(officer_df,
-        #                                                     allegation_df,
-        #                                                     victim_df,
-        #                                                     feat_dict)
+        officer_df, feat_dict, newvars = gen_victim_features(officer_df,
+                                                             allegation_df,
+                                                             victim_df,
+                                                             feat_dict)
         print('victims done')
 
         features += newvars
@@ -193,10 +193,11 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
     officer_df['api_count'] = 0
     officer_df['hispanic_count'] = 0
 
+    allegs = allegation_df[allegation_df.officer_id.isin(officer_df.id)].crid
+    victim_filter = victim_df[victim_df.allegation_id.isin(allegs)]
 
-
-    for aid in victim_df.allegation_id.unique():
-        victims = victim_df[victim_df.allegation_id == aid]
+    for aid in victim_filter.allegation_id.unique():
+        victims = victim_filter[victim_filter.allegation_id == aid]
 
         cnt = len(victims)
         white = len(victims[victims.race == 'White'])
@@ -205,7 +206,7 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
         api = len(victims[victims.race == 'Asian/Pacific Islander'])
 
         officers = allegation_df[allegation_df.crid == aid].officer_id
-        officer_df.loc[officer_df.id.isin(officers), 'victim_count'] += victims
+        officer_df.loc[officer_df.id.isin(officers), 'victim_count'] += cnt
         officer_df.loc[officer_df.id.isin(officers), 'white_count'] += white
         officer_df.loc[officer_df.id.isin(officers), 'black_count'] += black
         officer_df.loc[officer_df.id.isin(officers), 'api_count'] += api
@@ -475,17 +476,18 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
 
             for foid in firearm_oid:
 
-                if (foid in network.nodes) & (nx.has_path(network, oid, foid)):
-                    length = nx.shortest_path_length(network, oid, foid)
+                if foid in network.nodes:
+                    if nx.has_path(network, oid, foid):
+                        length = nx.shortest_path_length(network, oid, foid)
 
-                    if length < 4:
-                        below_four_firearm += 1
+                        if length < 4:
+                            below_four_firearm += 1
 
-                    if shortest_firearm:
-                        if length < shortest_firearm:
+                        if shortest_firearm:
+                            if length < shortest_firearm:
+                                shortest_firearm = length
+                        else:
                             shortest_firearm = length
-                    else:
-                        shortest_firearm = length
 
 
             if shortest_firearm:
