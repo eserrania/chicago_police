@@ -19,7 +19,7 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
     print('gender done')
     officer_df = used_firearm(officer_df, trr_df, end_date_set)
     print('firearm done')
-    officers_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
+    officer_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
     print('firearm outcome done')
 
 
@@ -194,26 +194,26 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
     officer_df['hispanic_count'] = 0
 
     allegs = allegation_df[allegation_df.officer_id.isin(officer_df.id)].crid
+    len(allegs)
     victim_filter = victim_df[victim_df.allegation_id.isin(allegs)]
+    len(victim_filter)
 
     for aid in victim_filter.allegation_id.unique():
         victims = victim_filter[victim_filter.allegation_id == aid]
 
         cnt = len(victims)
         if cnt > 0:
-            print(cnt)
-
-        white = len(victims[victims.race == 'White'])
-        black = len(victims[victims.race == 'Black'])
-        hisp = len(victims[victims.race == 'Hispanic'])
-        api = len(victims[victims.race == 'Asian/Pacific Islander'])
-
-        officers = allegation_df[allegation_df.crid == aid].officer_id
-        officer_df.loc[officer_df.id.isin(officers), 'victim_count'] += cnt
-        officer_df.loc[officer_df.id.isin(officers), 'white_count'] += white
-        officer_df.loc[officer_df.id.isin(officers), 'black_count'] += black
-        officer_df.loc[officer_df.id.isin(officers), 'api_count'] += api
-        officer_df.loc[officer_df.id.isin(officers), 'hispanic_count'] += hisp
+            #print(cnt)
+            white = len(victims[victims.race == 'White'])
+            black = len(victims[victims.race == 'Black'])
+            hisp = len(victims[victims.race == 'Hispanic'])
+            api = len(victims[victims.race == 'Asian/Pacific Islander'])
+            officers = allegation_df[allegation_df.crid == aid].officer_id
+            officer_df.loc[officer_df.id.isin(officers), 'victim_count'] += cnt
+            officer_df.loc[officer_df.id.isin(officers), 'white_count'] += white
+            officer_df.loc[officer_df.id.isin(officers), 'black_count'] += black
+            officer_df.loc[officer_df.id.isin(officers), 'api_count'] += api
+            officer_df.loc[officer_df.id.isin(officers), 'hispanic_count'] += hisp
 
 
     officer_df['pct_white_victims'] = officer_df.white_count / \
@@ -588,13 +588,13 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
             varname = 'shortest_path_sustained_officer_{}'.format(val)
 
             officer_df[varname] = [1 if x == val else 0 for x in
-                                   officers_df.shortest_path_sustained_officer]
+                                   officer_df.shortest_path_sustained_officer]
 
         for val in feat_dict['shortest_path_shooting_officer']:
             varname = 'shortest_path_shooting_officer_{}'.format(val)
 
             officer_df[varname] = [1 if x == val else 0 for x in
-                                   officers_df.shortest_path_shooting_officer]
+                                   officer_df.shortest_path_shooting_officer]
 
         scaler_1 = feat_dict['shortest_path_below_four_shooting']
         scaler_2 = feat_dict['shortest_path_below_four_sustained']
