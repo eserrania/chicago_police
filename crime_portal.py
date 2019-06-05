@@ -41,8 +41,16 @@ def beat_quartile_trrs(
         'second': 'second_quartile_trrs',
         'third': 'third_quartile_trrs',
         'fourth': 'fourth_quartile_trrs'}, inplace=True)
-    return officer_df.merge(
-        officer_quartiles, left_on='id', right_on='officer_id')
+    officer_df = officer_df.merge(
+        officer_quartiles, , how='left', left_on='id', right_on='officer_id')
+    for col_name in ['first_quartile_trrs',
+                     'second_quartile_trrs',
+                     'third_quartile_trrs',
+                     'fourth_quartile_trrs']:
+        officer_df[col_name] = officer_df[col_name].fillna(
+            officer_df[col_name].mean)
+    return officer_df
+
 
 
 
@@ -84,5 +92,12 @@ def beat_quartile_complaints(
                  'second': 'second_quartile',
                  'third': 'third_quartile', 
                  'fourth': 'fourth_quartile'}, inplace=True)
-    return officer_df.merge(
-        officer_quartiles, left_on='id', right_on='officer_id')
+    officer_df = officer_df.merge(
+        officer_quartiles, how='left', left_on='id', right_on='officer_id')
+    for col_name in ['first_quartile',
+                     'second_quartile',
+                     'third_quartile',
+                     'fourth_quartile']:
+        officer_df[col_name] = officer_df[col_name].fillna(
+            officer_df[col_name].mean)
+    return officer_df
