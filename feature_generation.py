@@ -500,18 +500,19 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
                                'shortest_path_shooting_officer'] = 'no_path'
 
             for soid in sustained_oid:
-                if (soid in network.nodes) & (nx.has_path(network, oid, soid)):
-                    length = nx.shortest_path_length(network, oid, soid)
+                if soid in network.nodes:
+                    nx.has_path(network, oid, soid):
+                        length = nx.shortest_path_length(network, oid, soid)
 
-                    if length < 4:
-                        below_four_sustained += 1
+                        if length < 4:
+                            below_four_sustained += 1
 
-                    if shortest_sustained:
-                        if length < shortest_sustained:
+                        if shortest_sustained:
+                            if length < shortest_sustained:
+                                shortest_sustained = length
+
+                        else:
                             shortest_sustained = length
-
-                    else:
-                        shortest_sustained = length
 
             if shortest_sustained:
                 officer_df.loc[officer_df.id == oid,
