@@ -3,29 +3,76 @@ import numpy as np
 import networkx as nx
 import math
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from statistics import mode
 
-def generate_features(officer_df, salary_df, allegation_df, end_date_train,
-                      bins=4):
+def generate_features(officer_df, allegation_df, end_date_set, 
+                      train_test='train', feat_dict=None, augmented=False):
     '''
 
     '''
+
+    officer_df = create_sustained_outcome(officer_df, allegation_df,
+                                          end_date_set)
     officer_df = create_gender_dummy(officer_df)
-    officer_df = create_race_dummies(officer_df)
-    officer_df = create_age_dummies(officer_df, end_date_train)
-    officer_df = create_tenure_dummies(officer_df, end_date_train)
-    officer_df = create_rank_dummies(officer_df, salary_df, end_date_train)
-    officer_df = gen_allegation_features(officer_df, allegation_df,
-                                         end_date_train)
-    
-    return officer_df
 
-def create_sustained_outcome(officer_df, allegation_df, end_date_train):
+
+    if train_test == 'train':
+        features = ['gender', 'tenure', 'number_complaints',
+                    'pct_officer_complaints', 'pct_sustained_complaints']
+        feat_dict = {}
+
+        officer_df, feat_dict, newvars = create_race_dummies(officer_df,
+                                                             feat_dict)
+        features += newvars
+
+        officer_df, feat_dict = create_age_var(officer_df, end_date_set,
+                                               feat_dict)
+
+        officer_df, feat_dict = create_tenure_var(officer_df, end_date_set 
+                                                  feat_dict)
+        officer_df, feat_dict = gen_allegation_features(officer_df,
+                                                        allegation_df,
+                                                        end_date_set, feat_dict)
+
+    if train_test == 'test':
+        officer_df = create_race_dummies(officer_df, feat_dict, train=False)
+        officer_df = create_age_var(officer_df, end_date_set, feat_dict, 
+                                    train=False)
+        officer_df = create_tenure_var(officer_df, end_date_set, feat_dict, 
+                                       train=False)
+        officer_df = gen_allegation_features(officer_df, allegation_df, 
+                                             end_date_set, feat_dict,
+                                             train=False)
+
+
+
+    if augmented:
+        network =  create_coaccusals_network(allegation_df, end_date_set)
+        if train_test == 'train':
+            officer_df, feat_dict, newvars = gen_network_features(officer_df,
+                                                                  network,
+                                                                  feat_dict)
+
+            features += newvars
+
+        if train_test == 'test':
+            officer_df = gen_network_features(officer_df, network, feat_dict,
+                                              train=False)
+    
+    if train_test == 'train':
+        return officer_df, feat_dict, features
+
+    if train_test == 'test':
+        return officer_df
+
+def create_sustained_outcome(officer_df, allegation_df, end_date_set):
     '''
     Given the officers and merged allegation dfs, creates an outcome column
     indicating whether or not the officer had a sustained investigation.
     '''
     outcome_window = allegation_df.loc[
-        allegation_df.incident_date > end_date_train]
+        allegation_df.incident_date > end_date_set]
     sustained = outcome_window.loc[outcome_window.final_finding == "SU"]
     officer_df['sustained_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(sustained.officer_id) else 0, axis=1)
@@ -35,57 +82,99 @@ def create_gender_dummy(officer_df):
     '''
     Given the officers dataframe, convert the gender variable into a dummy. 
     '''
-    officer_df.gender = np.where(officer_df.gender == 'F', 1 , 0)
+    officer_df = officer_df.fillna(value={gender: mode(officer_df.gender)})
+    officer_df['gender'] = np.where(officer_df.gender == 'F', 1 , 0)
     
     return officer_df
 
 
-def create_race_dummies(officer_df):
+def create_race_dummies(officer_df, feat_dict, train=True):
     '''
     Given the officers dataframe, creates race dummies. 
     '''
+    officer_df = officer_df.fillna(value={'race': 'unknown'})
     officer_df.race = [race.lower().replace('/', '_').replace(' ', '') 
                        for race in officer_df.race]
-    officer_df = pd.get_dummies(officer_df, columns=['race'])
-    return officer_df
+    if train:
+        newvars = []
+        values = officer.race.unique()
+        feat_dict['race'] = values
+        officer_df = pd.get_dummies(officer_df, columns=['race'])
+        for val in values:
+            varname = 'race_{}'.format(val)
+            newvars.append(varname)
+
+        return officer_df, feat_dict, newvars
+
+    else:
+        for val in feat_dict['race']:
+            officer_df['race_{}'.format(val)] = [1 if race == val else 0
+                                                 for race in officers_df.race]
+        return officer_df
 
 
-def create_age_dummies(officer_df, end_date_train, bins=4):
+def create_age_var(officer_df, end_date_set, feat_dict, train=True):
     '''
     Given the officers dataframe and the end date of the training data set,
-        calculates the officer´s age at that time, discretizes the age, and
-        creates dummies for each age range.
+        calculates the officer´s age at that time and scales it.
     '''
             
-    officer_df['age'] = pd.cut(end_date_train.year - officer_df.birth_year,
-                               bins)
-    officer_df = pd.get_dummies(officer_df, columns=['age'])
-    return officer_df
+    officer_df['age'] = [end_date_set.year - year
+                         for year in officer_df.birth_year]
+
+    officer_df = officer_df.fillna(value={'age': np.mean(officer_df.age)})
+
+    if train:
+        scaler = MinMaxScaler()
+        officer_df['age'] = scaler.fit_transform(\
+            np.array(officer_df['age']).reshape(-1, 1))
+        feat_dict['age'] = scaler
+
+        return officer_df, feat_dict
+
+    else:
+        scaler = feat_dict['age']
+        officer_df['age'] = scaler.transform(\
+            np.array(officer_df['age']).reshape(-1, 1))
+
+        return officer_df
 
 
-def create_tenure_dummies(officer_df, end_date_train, bins=4):
+def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
     '''
     Given the officers dataframe and the end date of the training data set,
-        calculates the officer´s age at that time, discretizes the age, and
-        creates dummies for each age range.
+        calculates the officer´s tenure at that timee and scales it.
     '''
-    officer_df['tenure'] = [math.floor(((end_date_train - date).days) / 365.25) 
+    officer_df['tenure'] = [math.floor(((end_date_set - date).days) / 365.25) 
                             for date in officer_df.appointed_date]
-    officer_df['tenure'] = pd.cut(officer_df.tenure, bins)
-    officer_df = pd.get_dummies(officer_df, columns=['tenure'])
-    return officer_df
+    officer_df = officer_df.fillna(value={'tenure': np.mean(officer_df.tenure)})
 
+    if train:
+        scaler = MinMaxScaler()
+        officer_df['tenure'] = scaler.fit_transform(\
+            np.array(officer_df['tenure']).reshape(-1, 1))
+        feat_dict['tenure'] = scaler
 
-def create_rank_dummies(officer_df, salary_df, end_date_train, bins=4):
-    '''
+        return officer_df, feat_dict
+
+    else:
+        scaler = feat_dict['tenure']
+        officer_df['tenure'] = scaler.transform(\
+            np.array(officer_df['tenure']).reshape(-1, 1))
+
+        return officer_df
+
+'''
+def create_rank_dummies(officer_df, salary_df, end_date_set):
+    
     Given the officers dataframe, their salary history and the end date of the
         training data set creates dummy variables with the officer's rank at 
         that time.
-    '''
+    
     officer_df = officer_df.drop(columns=['rank'])
-    salary_df = salary_df[[ryear <= end_date_train.year 
+    salary_df = salary_df[[ryear <= end_date_set.year 
                            for ryear in salary_df.year]]
-    salary_df = salary_df[[date <= end_date_train 
+    salary_df = salary_df[[date <= end_date_set 
                            for date in salary_df.spp_date]]
     current_ranks = salary_df.groupby('officer_id')['year'].max().to_frame()
     current_ranks = current_ranks.merge(salary_df[['officer_id', 'rank',
@@ -96,16 +185,17 @@ def create_rank_dummies(officer_df, salary_df, end_date_train, bins=4):
     officer_df = pd.get_dummies(officer_df, columns=['rank'])
     
     return officer_df.drop(columns=['year'])
+'''
 
-
-def gen_allegation_features(officer_df, allegation_df, end_date_train):
+def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
+                            train=True):
     '''
     Given the officers dataframe and the their complaint history, creates 
         variables with their complaint counts, percentage of officer complaints,
         and percentage of sustained complaints.
     '''
     
-    allegation_df = allegation_df[allegation_df.incident_date < end_date_train]
+    allegation_df = allegation_df[allegation_df.incident_date < end_date_set]
     allegation_df = allegation_df[allegation_df['officer_id']\
         .isin(officer_df.id.unique())]
     officer_df['number_complaints'] = 0
@@ -130,18 +220,29 @@ def gen_allegation_features(officer_df, allegation_df, end_date_train):
             sustained[oid] / count[oid]
 
     #internal_allegation_percentile
-    
-    return officer_df
+    if train:
+        scaler = MinMaxScaler()
+        officer_df['number_complaints'] = scaler.fit_transform(\
+            np.array(officer_df['number_complaints']).reshape(-1, 1))
+        feat_dict['number_complaints'] = scaler
+
+        return officer_df, feat_dict
+
+    else:
+        scaler = feat_dict['number_complaints']
+        officer_df['number_complaints'] = scaler.transform(\
+            np.array(officer_df['number_complaints']).reshape(-1, 1))
+        return officer_df
 
 
-def create_coaccusals_network(allegation_df, end_date_train):
+def create_coaccusals_network(allegation_df, end_date_set):
     '''
     '''
 
     G = nx.Graph()
     
     allegations = allegation_df[allegation_df.incident_date \
-                                <= end_date_train].crid
+                                <= end_date_set].crid
 
     for aid in allegations.unique():
         officers = allegation_df[allegation_df.crid == aid]    
@@ -162,13 +263,13 @@ def create_coaccusals_network(allegation_df, end_date_train):
 
 
 def add_investigators_network(network, investigators_df, allegation_df,
-                              end_date_train):
+                              end_date_set):
     '''
     '''
 
     investigators_df = investigators_df[investigators_df.officer_id.notnull()]
     allegations = allegation_df[allegation_df.incident_date \
-                                <= end_date_train].crid
+                                <= end_date_set].crid
 
     for aid in allegations.unique():
         investigator = investigators_df[investigators_df.allegation_id == aid]
@@ -188,36 +289,36 @@ def add_investigators_network(network, investigators_df, allegation_df,
 
     return network
 
-def create_firearm_outcome(officer_df, trr, end_date_train):
+def create_firearm_outcome(officer_df, trr, end_date_set):
     '''
     Given the officers and trr dfs, creates an outcome column
     indicating whether or not the officer used a firearm in the
     outcome window.
     '''
     outcome_window = trr.loc[
-        trr.trr_datetime > end_date_train]
+        trr.trr_datetime > end_date_set]
     firearm_trrs = outcome_window.loc[train_window.firearm_used]
     officer_df['firearm_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
     return officer_df
 
-def used_firearm(officer_df, trr, end_date_train):
+def used_firearm(officer_df, trr, end_date_set):
     '''
     Dummy for identifying officers who used a firearm in the training
     period.
     '''
     train_window = trr.loc[
-        trr.trr_datetime <= end_date_train]
+        trr.trr_datetime <= end_date_set]
     firearm_trrs = train_window.loc[train_window.firearm_used]
     officer_df['used_firearm'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
     return officer_df
 
 
-def add_same_unit_network(network, history_df, end_date_train):
+def add_same_unit_network(network, history_df, end_date_set):
     '''
     '''
-    history = history_df[history_df.effective_date <= end_date_train]
+    history = history_df[history_df.effective_date <= end_date_set]
 
     for unit in history_df.unit_id.unique():
         officers = history_df[history_df.unit_id == unit]
@@ -263,12 +364,167 @@ def add_same_unit_network(network, history_df, end_date_train):
     return network
 
 
-def create_network(allegation_df, investigators_df, history_df, end_date_train):
+def create_network(allegation_df, investigators_df, history_df, end_date_set):
     '''
     '''
-    nw = create_coaccusals_network(allegation_df, end_date_train)
+    nw = create_coaccusals_network(allegation_df, end_date_set)
     nw = add_investigators_network(nw, investigators_df, allegation_df,
-                                   end_date_train)
-    nw = add_same_unit_network(nw, history_df, end_date_train)
+                                   end_date_set)
+    #nw = add_same_unit_network(nw, history_df, end_date_set)
     return nw
+
+
+def gen_network_features(officer_df, network, feat_dict, train=True):
+    '''
+    '''
+
+    firearm_oid = officer_df[officer_df.used_firearm == 1].id.unique()
+    sustained_oid = officer_df[officer_df.sustained_outcome == 1].id.unique()
+
+    officer_df['shortest_path_shooting_officer'] = None
+    officer_df['shortest_path_sustained_officer'] = None
+    officer_df['shortest_path_below_four_shooting'] = None
+    officer_df['shortest_path_below_four_sustained'] = None
+
+
+    for oid in officer_df.id:
+        below_four_firearm = 0
+        below_four_sustained = 0
+        shortest_firearm = None
+        shortest_sustained = None
+
+        if oid in network.nodes:
+
+            for foid in firearm_oid:
+
+                if (foid in network.nodes) & (nx.has_path(network, oid, foid)):
+                    length = nx.shortest_path_length(network, oid, foid)
+
+                    if length < 4:
+                        below_four_firearm += 1
+
+                    if shortest_firearm:
+                        if length < shortest_firearm:
+                            shortest_firearm = length
+                    else:
+                        shortest_firearm = length
+
+            
+            if shortest_firearm:
+                officer_df.loc[officer_df.id == oid,
+                               'shortest_path_shooting_officer'] = \
+                                round(shortest_firearm)
+
+            else:
+                officer_df.loc[officer_df.id == oid,
+                               'shortest_path_shooting_officer'] = 'no_path'
+
+            for soid in sustained_oid:
+                if (soid in network.nodes) & (nx.has_path(network, oid, soid)):
+                    length = nx.shortest_path_length(network, oid, soid)
+
+                    if length < 4:
+                        below_four_sustained += 1
+
+                    if shortest_sustained:
+                        if length < shortest_sustained:
+                            shortest_sustained = length
+
+                    else:
+                        shortest_sustained = length
+
+            if shortest_sustained:
+                officer_df.loc[officer_df.id == oid,
+                               'shortest_path_sustained_officer'] = \
+                               round(shortest_sustained)
+
+            else:
+                officer_df.loc[officer_df.id == oid,
+                               'shortest_path_sustained_officer'] = 'no_path'
+
+
+        else:
+            officer_df.loc[officer_df.id == oid,
+                           'shortest_path_shooting_officer'] = 'no_path'
+
+            officer_df.loc[officer_df.id == oid,
+                           'shortest_path_sustained_officer'] = 'no_path'
+
+        officer_df.loc[officer_df.id == oid,
+                       'shortest_path_below_four_shooting'] = \
+                       below_four_firearm
+
+        officer_df.loc[officer_df.id == oid,
+                       'shortest_path_below_four_sustained'] = \
+                       below_four_sustained
+
+    if train:
+        newvars = ['shortest_path_below_four_sustained',
+                   'shortest_path_below_four_shooting']
+
+        values_1 = officer_df['shortest_path_shooting_officer'].unique()
+        values_2 = officer_df['shortest_path_sustained_officer'].unique()
+        feat_dict['shortest_path_shooting_officer'] = values_1
+        feat_dict['shortest_path_sustained_officer'] = values_2
+
+        officer_df = pd.get_dummies(officer_df,
+                                    columns=['shortest_path_shooting_officer',
+                                             'shortest_path_sustained_officer'])
+        for val in officer.shortest_path_shooting_officer.unique():
+            varname = 'shortest_path_shooting_officer_{}'.format(val)
+            newvars.append(varname)
+
+        for val in officer.shortest_path_sustained_officer.unique():
+            varname = 'shortest_path_sustained_officer_{}'.format(val)
+            newvars.append(varname)
+
+
+        scaler_1 = MinMaxScaler()
+        scaler_2 = MinMaxScaler()
+
+        officer_df['shortest_path_below_four_shooting'] = \
+            scaler_1.fit_transform(np.array(\
+                officer_df['shortest_path_below_four_shooting']).reshape(-1,
+                                                                         1))
+
+        feat_dict['shortest_path_below_four_shooting'] = scaler_1
+
+        officer_df['shortest_path_below_four_sustained'] = \
+            scaler_2.fit_transform(np.array(\
+                officer_df['shortest_path_below_four_sustained']).reshape(-1,
+                                                                          1))
+
+        feat_dict['shortest_path_below_four_sustained'] = scaler_2
+
+        return officer_df, feat_dict, newvars
+
+    else:
+        for val in feat_dict['shortest_path_sustained_officer']:
+            varname = 'shortest_path_sustained_officer_{}'.format(val)
+
+            officer_df[varname] = [1 if x == val else 0 for x in
+                                   officers_df.shortest_path_sustained_officer]
+
+        for val in feat_dict['shortest_path_shooting_officer']:
+            varname = 'shortest_path_shooting_officer_{}'.format(val)
+
+            officer_df[varname] = [1 if x == val else 0 for x in
+                                   officers_df.shortest_path_shooting_officer]
+
+        scaler_1 = feat_dict['shortest_path_below_four_shooting']
+        scaler_2 = feat_dict['shortest_path_below_four_sustained']
+
+        officer_df['shortest_path_below_four_shooting'] = scaler_1.transform(\
+            np.array(officer_df['shortest_path_below_four_shooting']).\
+                reshape(-1, 1))
+
+        officer_df['shortest_path_below_four_sustained'] = scaler_2.transform(\
+            np.array(officer_df['shortest_path_below_four_sustained']).\
+                reshape(-1, 1))
+
+        return officer_df
+
+
+
+
 
