@@ -232,7 +232,7 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
         officer_df[have_victims].api_count /\
         officer_df[have_victims].victim_count
 
-    officer_df.loc[have_victims0, 'pct_hispanic_victims'] = \
+    officer_df.loc[have_victims, 'pct_hispanic_victims'] = \
         officer_df[have_victims].hispanic_count /\
         officer_df[have_victims].victim_count
 
