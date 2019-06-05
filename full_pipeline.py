@@ -18,107 +18,146 @@ class RawDfs:
             rd.create_df('officerallegation'),
             rd.create_df('investigator'),
             rd.create_df('investigatorallegation'))
-        self.allegation_sets = None
-        self.trr_sets = None
+        self.victim_df = rd.create_df('victim')
+        self.salary_df = rd.create_df('salary')
+        self.allegation_sets = []
+        self.trr_sets = []
+        self.salary_sets = []
+        self.investigator_sets = []
+        self.victim_sets = []
 
-    def train_test(self, outcome_time):
+    def train_test(self, outcome_time, words=True):
         print("Allegation sets")
         print()
         self.allegation_sets = tt.split_sets(
             self.allegation_df,
             outcome_time,
-            'incident_date', verbose=True)
+            'incident_date', verbose=words)
+        for all_set in self.allegation_sets:
+            inv_set = {}
+            vic_set = {}
+            inv_set['train'] = \
+                self.investigator_df.loc[
+                    self.investigator_df.allegation_id.isin(
+                        list(all_set.get('train').allegation_id))]
+            inv_set['test'] = \
+                self.investigator_df.loc[
+                    self.investigator_df.allegation_id.isin(
+                        list(all_set.get('test').allegation_id))]
+            vic_set['train'] = \
+                self.victim_df.loc[
+                    self.victim_df.allegation_id.isin(
+                        list(all_set.get('train').allegation_id))]
+            vic_set['test'] = \
+                self.victim_df.loc[
+                    self.victim_df.allegation_id.isin(
+                        list(all_set.get('test').allegation_id))]            
+            for date_val in ['start_date_train',
+                            'end_date_train',
+                            'start_date_outcome',
+                            'end_date_outcome',
+                            'start_date_test',
+                            'end_date_test',
+                            'outcome_time']:
+                inv_set[date_val] = all_set.get(date_val)
+                vic_set[date_val] = all_set.get(date_val)
+            self.investigator_sets.append(inv_set)
+            self.victim_sets.append(vic_set)
+            
+
         print()
         print()
         print("TRR sets")
         print()
-        self.trr_sets = tt.split_sets(self.trr_df,
+        self.trr_sets = tt.split_sets(
+            self.trr_df,
             outcome_time,
-            'trr_datetime', verbose=True)
+            'trr_datetime', verbose=words)
+        print()
+        print()
+        print("Salary sets")
+        self.salary_df['salary_date'] = pd.to_datetime(
+            ['{}-01-01'.format(round(y)) for y in self.salary_df.year])
+        self.salary_sets = tt.split_sets(
+            self.salary_df,
+            outcome_time,
+            'salary_date', verbose=words)
+        print()
+        print()
+
         return
 
-    def create_train_tests(self, outcome_time):
+    def create_train_tests(self, outcome_time, check_dates=False):
         self.train_test(outcome_time)
-        set_count = min(len(self.allegation_sets), len(self.trr_sets))
+        set_count = min(len(self.allegation_sets), len(self.trr_sets),
+                        len(self.salary_sets))
         set_list = []
         for i in range(set_count):
+            if check_dates:
+                for date_val in ['start_date_train',
+                                'end_date_train',
+                                'start_date_outcome',
+                                'end_date_outcome',
+                                'start_date_test',
+                                'end_date_test',
+                                'outcome_time']:
+                    print()
+                    print(str(i) + str(date_val))
+                   for tt_sets in [self.allegation_sets[i],
+                                    self.trr_sets[i],
+                                    self.salary_sets[i],
+                                    self.investigator_sets[i],
+                                    self.victim_sets[i]]:
+                        print(tt_sets.get(date_val))
+
             set_list.append(
                 TrainTest(self.allegation_sets[i],
-                    self.trr_sets[i]))
+                    self.trr_sets[i],
+                    self.salary_sets[i],
+                    self.investigator_sets[i],
+                    self.victim_sets[i]))
         return set_list
 
 class TrainTest:
     #NEED TO ADD METHODS FOR COMPARING REGULAR MODEL TO AUGMENTED MODEL
-    def __init__(self, allegation_set, trr_set):
+    def __init__(self, allegation_set, trr_set, salary_set, investigator_set,
+        victim_set):
         self.allegation_set = allegation_set
         self.trr_set = trr_set
+        self.salary_set = salary_set
+        self.investigator_set = investigator_set
+        self.victim_set = victim_set
         self.officer_df = rd.create_df('officer')
-        self.reg = {'train': self.officer_df.loc[(
-            self.officer_df.appointed_date < trr_set.get('start_date_outcome'))\
-             & (self.officer_df.resignation_date >= \
-                trr_set.get('start_date_train'))],
-             'test': self.officer_df.loc[(
-            self.officer_df.appointed_date < trr_set.get('start_date_test')) & \
-            (self.officer_df.resignation_date >= \
-                trr_set.get('start_date_train'))]}
-        self.aug = {'train': self.officer_df.loc[(
-            self.officer_df.appointed_date < trr_set.get('start_date_outcome'))\
-             & (self.officer_df.resignation_date >= \
-                trr_set.get('start_date_train'))],
-             'test': self.officer_df.loc[(
-            self.officer_df.appointed_date < trr_set.get('start_date_test')) & \
-            (self.officer_df.resignation_date >= \
-                trr_set.get('start_date_train'))]}
         self.start_date_train = allegation_set.get('start_date_train')
         self.end_date_train = allegation_set.get('end_date_train')
         self.start_date_outcome = allegation_set.get('start_date_outcome')
         self.end_date_outcome = allegation_set.get('end_date_outcome')
         self.start_date_test = allegation_set.get('start_date_test')
         self.end_date_test = allegation_set.get('end_date_test')
-        self.feature_dict = None
-        self.feature_list = None
+        self.train = self.officer_df.loc[(
+            self.officer_df.appointed_date < self.start_date_outcome)\
+             & (self.officer_df.resignation_date >= \
+                self.start_date_train)]
+        self.test = self.officer_df.loc[(
+            self.officer_df.appointed_date < self.end_date_test) & \
+            (self.officer_df.resignation_date >= \
+                self.start_date_test)]
+        self.feature_dict = {} 
+        self.reg_features = []
+        self.aug_features = []
 
 
-    def add_train_features(self, aug=False):
-        ## need to add trr features
-        if aug:
-            train_df = self.aug['train']
-            train_df, feat_dict, feat_lst = \
-                fg.generate_features(train_df, self.allegation_set.get('train'),
-                                     self.trr_set.get('train'),
-                                     self.end_train_date,
-                                     augmented=aug)
-            self.aug['train'] = train_df
-        else:
-            train_df = self.reg['train']
-            train_df, feat_dict, feat_lst = \
-                fg.generate_features(train_df, self.allegation_set.get('train'),
-                                     self.trr_set.get('train'),
-                                     self.end_train_date)
-            self.reg['train'] = train_df
+    def add_train_features(self):
 
-        self.feature_dict = feat_dict
-        self.feature_list = feat_lst
+        self.train, self.feature_dict, self.reg_features, self.aug_features = \
+            fg.generate_features(self.train, self.allegation_set.get('train'),
+                                 self.trr_set.get('train'),
+                                 self.end_date_train)
 
-
-    def add_test_features(self, aug=False):
-        if aug:
-            test_df = self.aug['test']
-            test_df = fg.generate_features(train_df,
-                                            self.allegation_set.get('test'),
-                                            self.trr_set.get('test'),
-                                            self.end_train_date,
-                                            train_test='test',
-                                            self.feature_dict,
-                                            augmented=aug)
-            self.aug['test'] = test_df
-
-        else:
-            test_df = self.aug['test']
-            test_df = fg.generate_features(train_df,
-                                            self.allegation_set.get('test'),
-                                            self.trr_set.get('test'),
-                                            self.end_train_date,
-                                            train_test='test',
-                                            self.feature_dict)
-            self.reg['test'] = test_df
+    def add_test_features(self):
+        self.test = fg.generate_features(self.test,
+                                        self.allegation_set.get('test'),
+                                        self.trr_set.get('test'),
+                                        self.end_date_train,
+                                        train_test='test',
+                                        feat_dict=self.feature_dict)
