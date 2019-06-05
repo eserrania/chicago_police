@@ -501,7 +501,7 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
 
             for soid in sustained_oid:
                 if soid in network.nodes:
-                    nx.has_path(network, oid, soid):
+                    if nx.has_path(network, oid, soid):
                         length = nx.shortest_path_length(network, oid, soid)
 
                         if length < 4:
