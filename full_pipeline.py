@@ -35,78 +35,90 @@ class RawDfs:
         self.trr_sets = tt.split_sets(self.trr_df,
             outcome_time,
             'trr_datetime', verbose=True)
+        return
 
-    def select_sets(self, allegation_set_num, trr_set_num):
-        if not self.allegation_sets or not self.trr_sets:
-            print("Train test sets have not been created")
-            pass
-        allegation_set = self.allegation_sets[allegation_set_num]
-        trr_set = self.trr_sets[trr_set_num]
-        for key in ['start_date_train',
-                    'end_date_train',
-                    'start_date_outcome',
-                    'end_date_outcome',
-                    'start_date_test',
-                    'end_date_test',
-                    'outcome_time']:
-            if allegation_set[key] != trr_set[key]:
-                print("Allegation " + key + "does not match TRR " + key)
-                pass
-
-        else:
-            return TrainTest(allegation_set, trr_set)
-
+    def create_train_tests(self, outcome_time):
+        self.train_test(outcome_time)
+        set_count = min(len(self.allegation_sets), len(self.trr_sets))
+        set_list = []
+        for i in range(set_count):
+            set_list.append(
+                TrainTest(self.allegation_sets[i],
+                    self.trr_sets[i]))
+        return set_list
 
 class TrainTest:
+    #NEED TO ADD METHODS FOR COMPARING REGULAR MODEL TO AUGMENTED MODEL
     def __init__(self, allegation_set, trr_set):
         self.allegation_set = allegation_set
         self.trr_set = trr_set
         self.officer_df = rd.create_df('officer')
-        self.officer_train = self.officer_df.loc[(
+        self.reg = {'train': self.officer_df.loc[(
             self.officer_df.appointed_date < trr_set.get('start_date_outcome'))\
              & (self.officer_df.resignation_date >= \
-                trr_set.get('start_date_train'))]
-        self.officer_test = self.officer_df.loc[(
+                trr_set.get('start_date_train'))],
+             'test': self.officer_df.loc[(
             self.officer_df.appointed_date < trr_set.get('start_date_test')) & \
             (self.officer_df.resignation_date >= \
-                trr_set.get('start_date_train'))]
-        self.grid = 'test'
-        self.clfs = ['RandomForest']
-        self.label = 'sustained_outcome'
-        self.metric_dict = {'precision': [100, 5, 20, 50, 80],
-               'recall': [100, 5, 20, 50, 80],
-               'f1': [5],
-               'accuracy': [50]}
-        self.metrics = 'pop'
-        self.output_df = None
+                trr_set.get('start_date_train'))]}
+        self.aug = {'train': self.officer_df.loc[(
+            self.officer_df.appointed_date < trr_set.get('start_date_outcome'))\
+             & (self.officer_df.resignation_date >= \
+                trr_set.get('start_date_train'))],
+             'test': self.officer_df.loc[(
+            self.officer_df.appointed_date < trr_set.get('start_date_test')) & \
+            (self.officer_df.resignation_date >= \
+                trr_set.get('start_date_train'))]}
+        self.start_date_train = allegation_set.get('start_date_train')
+        self.end_date_train = allegation_set.get('end_date_train')
+        self.start_date_outcome = allegation_set.get('start_date_outcome')
+        self.end_date_outcome = allegation_set.get('end_date_outcome')
+        self.start_date_test = allegation_set.get('start_date_test')
+        self.end_date_test = allegation_set.get('end_date_test')
 
-    def add_train_features(self):
-    ## need to add trr features
-        self.officer_train = fg.generate_features(
-            self.officer_train, rd.create_df('salary'),
+
+    def add_train_features(self, aug=False):
+        ## need to add trr features
+        if aug:
+            train_df = self.aug['train']
+        else:
+            train_df = self.reg['train']
+        train_df = fg.generate_features(
+            train_df, rd.create_df('salary'),
             self.allegation_set.get('train'),
-            self.allegation_set.get('end_date_train'))
-        self.officer_train = fg.create_sustained_outcome(
-            self.officer_train, self.allegation_set.get('train'),
-            self.allegation_set.get('end_date_train'))
-        self.officer_train = self.officer_train.dropna()
+            self.end_train_date)
+        train_df = fg.create_sustained_outcome(
+            train_df, self.allegation_set.get('train'),
+            self.end_train_date)
+        train_df = train_df.dropna()
+        if aug:
+            ## add extra augmented features
+            self.aug['train'] = train_df
+        else:
+            self.reg['train'] = train_df
+            pass
 
-    def add_test_features(self):
+    def add_test_features(self, aug=False):
     ## need to add trr features
     ## THIS WILL NEED TO BE EDITED SO CONTINUOUS FEATURES ARE SCALED TO TRAINING SET
-        self.officer_test = fg.generate_features(
-            self.officer_test, rd.create_df('salary'),
+        self.reg['test'] = fg.generate_features(
+            self.reg['test'], rd.create_df('salary'),
             self.allegation_set.get('test'),
             self.allegation_set.get('end_date_outcome'))
-        self.officer_test = fg.create_sustained_outcome(
-            self.officer_test, self.allegation_set.get('test'),
+        self.reg['test'] = fg.create_sustained_outcome(
+            self.reg['test'], self.allegation_set.get('test'),
             self.allegation_set.get('end_date_outcome'))
-        self.officer_test = self.officer_test.dropna()
-
+        self.reg['test'] = self.reg['test'].dropna()
+'''
     def run_loop(self):
+        #UPDATE THIS PART LATER TO BE MORE EFFICIENT
+        time_splits = self.allegation_set
+        time_splits['train'] = self.officer_train
+        time_splits['test'] = self.officer_test
         self.output_df = ml.classifier_loop(
-            [self.allegation_set], self.grid, self.clfs, self.metric_dict, self.label,
-            preds_drop, self.metrics, plot=True, save=False)
+            [time_splits], self.grid, self.clfs, self.metric_dict, self.label,
+            ['appointed_date', 'resignation_date'], self.metrics, plot=True, save=False)
+'''
 
 
 

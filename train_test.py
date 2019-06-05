@@ -29,45 +29,49 @@ def split_sets(df, outcome_time, date_col, start_date='01-01-2010',
         2 * (outcome_time)) - start_date_train) / np.timedelta64(1,'Y'))
     count = 0
     set_list = []
+    '''
     for train_years in range(1, max_train_years + 1):
         if verbose:
             print("Sets trained with {} year(s) of data".format(train_years))
             print()
         end_date_test = start_date_train
-        increment = 0
-        while end_date_test + np.timedelta64(1,'Y') <= final_date: 
+    '''
+    end_date_test = start_date_train
 
-            end_date_train = start_date_train + \
-                (np.timedelta64(train_years + increment,'Y')) - \
-                np.timedelta64(1,'D')
-            end_date_outcome = end_date_train + np.timedelta64(1,'D') + \
-                outcome_time
-            end_date_test = end_date_outcome + outcome_time - \
-                np.timedelta64(1,'D')   
-            if verbose:
-                print(
-                    ("Training set {} is trained from {} to {} to predict the " +\
-                    "outcome from {} to {} and tested on outcomes in " +\
-                    "{} to {}").format(
-                        str(count), str(start_date_train)[:10],
-                        str(end_date_train)[:10],
-                        str(end_date_train + np.timedelta64(1,'D'))[:10], 
-                        str(end_date_outcome)[:10], 
-                        str(end_date_outcome + np.timedelta64(1,'D'))[:10],
-                        str(end_date_test)[:10]))
-            train_df = df.loc[df[date_col] <= end_date_outcome]
-            test_df = df.loc[df[date_col] <= end_date_test]
-            set_dict = {"train": train_df, "test": test_df,
-                "start_date_train": start_date_train,
-                "end_date_train": end_date_train,
-                "start_date_outcome": end_date_train + np.timedelta64(1,'D'),
-                "end_date_outcome": end_date_outcome,
-                "start_date_test": end_date_outcome + np.timedelta64(1,'D'),
-                "end_date_test" : end_date_test, 
-                "outcome_time": outcome_time}
-            set_list.append(set_dict)
-            increment += 1
-            count += 1
+    increment = 0
+    while end_date_test + np.timedelta64(1,'Y') <= final_date: 
+
+        end_date_train = start_date_train + \
+            (np.timedelta64(1 + increment,'Y')) - \
+            np.timedelta64(1,'D')
+        end_date_outcome = end_date_train + np.timedelta64(1,'D') + \
+            outcome_time
+        end_date_test = end_date_outcome + outcome_time - \
+            np.timedelta64(1,'D')   
+        if verbose:
+            print(
+                ("Training set {} is trained from {} to {} to predict the " +\
+                "outcome from {} to {} and tested on outcomes in " +\
+                "{} to {}").format(
+                    str(count), str(start_date_train)[:10],
+                    str(end_date_train)[:10],
+                    str(end_date_train + np.timedelta64(1,'D'))[:10], 
+                    str(end_date_outcome)[:10], 
+                    str(end_date_outcome + np.timedelta64(1,'D'))[:10],
+                    str(end_date_test)[:10]))
+        train_df = df.loc[df[date_col] <= end_date_outcome]
+        test_df = df.loc[df[date_col] <= end_date_test]
+        set_dict = {"train": train_df, "test": test_df,
+            "start_date_train": start_date_train,
+            "end_date_train": end_date_train,
+            "start_date_outcome": end_date_train + np.timedelta64(1,'D'),
+            "end_date_outcome": end_date_outcome,
+            "start_date_test": end_date_outcome + np.timedelta64(1,'D'),
+            "end_date_test" : end_date_test, 
+            "outcome_time": outcome_time}
+        set_list.append(set_dict)
+        increment += 1
+        count += 1
         print()
     return set_list
 
