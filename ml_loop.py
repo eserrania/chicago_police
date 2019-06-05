@@ -1,12 +1,21 @@
 '''
 Machine learning functions
 '''
-
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier
+from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix, accuracy_score
+from sklearn.model_selection import train_test_split, cross_validate, GridSearchCV, ParameterGrid
+from sklearn import preprocessing, svm, metrics, tree, decomposition
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+#from sklearn.neighbors.nearest_centroid import NearestCentroid
+#from sklearn.naive_bayes import GaussianNB, MultinomialNB, BernoulliNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import *
 from __future__ import division
 import pandas as pd
-import re
 import numpy as np
 import os
+import re
 import matplotlib.pyplot as plt
 import pylab as pl
 from datetime import timedelta, datetime
@@ -14,17 +23,8 @@ import random
 from scipy import optimize
 import time
 import seaborn as sns
-from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix, accuracy_score
-from sklearn import preprocessing, svm, metrics, tree, decomposition, svm
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier
-from sklearn.linear_model import LogisticRegression, Perceptron, SGDClassifier, OrthogonalMatchingPursuit, LogisticRegressionCV
-from sklearn.neighbors.nearest_centroid import NearestCentroid
-from sklearn.naive_bayes import GaussianNB, MultinomialNB, BernoulliNB
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split, cross_validate, GridSearchCV, ParameterGrid
-from sklearn.metrics import *
-from sklearn.preprocessing import StandardScaler
+
+#from sklearn.preprocessing import StandardScaler
 import itertools
 import warnings
 
@@ -38,8 +38,8 @@ SEED = 84
 # ML loop
 ################################################################################
 
-def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
-                    metrics, plot=False, save=False):
+def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
+                    metrics, plot=False, save=None):
     '''
     Loops through the classifiers, parameters and train-test pairs and saves
     the results into a pandas dataframe.
@@ -54,7 +54,7 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
             classification
         - metrics (str): choose to get population or regular metrics
         - plot (bool): plots precision recall curve if set to true
-        - save (bool): saves output df into csv if set to true
+        - save (str): saves output df into csv if a filename is provided
 
     Returns a pandas dataframe with the looping results
 
@@ -74,45 +74,49 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label, preds_drop,
             #print(p)
             # loop through TrainTest object list
             for st, obj in enumerate(set_lst):
-                reg_aug_dict = {'regular': obj.reg, 'augmented': obj.aug}
-                for ra, dict in reg_aug_dict.items():
-                    print('****')
-                    # get data from dictionary
-                    train = dict['train']
-                    test = dict['test']
-                    train_start = obj.start_date_train
-                    train_end = obj.end_date_train
-                    test_start = obj.start_date_test
-                    test_end = obj.end_date_test
+                reg_aug_dict = {'regular': obj.reg_features,
+                                'augmented': obj.aug_features}
+                for ra, feat_lst in reg_aug_dict.items():
+                    # labels: ['firearm_outcome', 'sustained_outcome']
+                    for label in label_lst:
+                        print('** {} model on outcome {}, TrainTest object {}'.format(
+                              ra, label, st))
+                        # get data from dictionary
+                        train = obj.train
+                        test = obj.test
+                        train_start = obj.start_date_train
+                        train_end = obj.end_date_train
+                        test_start = obj.start_date_test
+                        test_end = obj.end_date_test
 
-                    # instantiate classifier
-                    cl = clfr.set_params(**p)
+                        # instantiate classifier
+                        cl = clfr.set_params(**p)
 
-                    print('** Working on the {} classifier {} with parameters {}.'.format(
-                          name, clfr, p))
-                    print('* Training from {} to {} and testing from {} to {}.'.format(
-                          train_start, train_end, test_start, test_end))
+                        print('* Working on the {} classifier with parameters {}.'.format(
+                              name, p))
+                        print('* Training from {} to {} and testing from {} to {}.'.format(
+                              train_start, train_end, test_start, test_end))
 
-                    # separate into train, test
-                    X_train = train.drop(columns=preds_drop)
-                    y_train = train[label]
-                    X_test = test.drop(columns=preds_drop)
-                    y_test = test[label]
+                        # separate into train, test
+                        X_train = train[feat_lst]
+                        y_train = train[label]
+                        X_test = test[feat_lst]
+                        y_test = test[label]
 
-                    cl.fit(X_train, y_train)
+                        cl.fit(X_train, y_train)
 
-                    if name == 'SVM':
-                        pred_probs = cl.decision_function(X_test)
-                    else:
-                        pred_probs = cl.predict_proba(X_test)[:, 1]
+                        if name == 'SVM':
+                            pred_probs = cl.decision_function(X_test)
+                        else:
+                            pred_probs = cl.predict_proba(X_test)[:, 1]
 
-                    importances = cl.feature_importances_
-                    # update metric dataframe
-                    update_metrics_df(output_df, y_test, pred_probs, name, importances,
-                                      p, st, ra, train_start, train_end,
-                                      test_start, test_end, metrics)
-                    if plot:
-                        plot_precision_recall_n(y_test, pred_probs, name, plot)
+                        importances = cl.feature_importances_
+                        # update metrics dataframe
+                        update_metrics_df(output_df, y_test, pred_probs, name, importances,
+                                          p, st, ra, label, train_start, train_end,
+                                          test_start, test_end, metrics)
+                        if plot:
+                            plot_precision_recall_n(y_test, pred_probs, name, plot)
 
     if save:
         output_df.to_csv(file_name)
@@ -240,7 +244,7 @@ def create_output_df(metric_dict):
     return output_df
 
 def update_metrics_df(output_df, y_test, pred_probs, name, importances, parameters, st, ra,
-                      train_start, train_end, test_start, test_end, metrics):
+                      label, train_start, train_end, test_start, test_end, metrics):
     '''
     Updates metrics dataframe
 
@@ -250,7 +254,7 @@ def update_metrics_df(output_df, y_test, pred_probs, name, importances, paramete
         - pred_probs:
     '''
     # minimum columns to identify model
-    result_lst = [name, importances, parameters, st, ra, train_start, train_end,
+    result_lst = [name, importances, parameters, st, ra, label, train_start, train_end,
                   test_start, test_end]
 
     # list of columns to fill in metrics for
