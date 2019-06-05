@@ -14,15 +14,15 @@ def read_beat_data():
     return beat, crime_beat_quartiles
 
 def beat_quartile_trrs(
-    officer_df, trr, start_date_train, end_date_train):
+    officer_df, trr, end_date_train):
     '''
     Adds features indicating average number of trrs per year in beats of
     the first, second, third, and fourth quartiles of crime by month.
     '''
     beat, crime_beat_quartiles = read_beat_data()
-    trr = trr.loc[(trr.trr_datetime <= end_date_train) & \
-        (trr.trr_datetime >= start_date_train)]
-    total_years = (end_date_train - start_date_train) / np.timedelta64(1, 'Y')
+    trr = trr.loc[(trr.trr_datetime <= end_date_train)]
+    total_years = (end_date_train - pd.to_datetime('01-01-2010')) \
+        / np.timedelta64(1, 'Y')
     trr['trr_month'] = trr.trr_datetime.map(lambda x: x.strftime('%Y-%m'))
     merged_quartiles = trr.merge(
         crime_beat_quartiles, 
@@ -55,7 +55,7 @@ def beat_quartile_trrs(
 
 
 def beat_quartile_complaints(
-    officer_df, merged_allegation, start_date_train, end_date_train):
+    officer_df, merged_allegation, end_date_train):
     '''
     Adds features indicating average number of complaints per year in beats of
     the first, second, third, and fourth quartiles of crime by month.
@@ -71,8 +71,7 @@ def beat_quartile_complaints(
     merged_allegation['name'] = \
         merged_allegation.name.astype('int')
     merged_allegation = merged_allegation.loc[
-        (merged_allegation['incident_date'] <= end_date_train),
-        (merged_allegation['incident_date'] >= start_date_train)]
+        (merged_allegation['incident_date'] <= end_date_train)]
     merged_allegation['incident_month'] = \
         merged_allegation.incident_date.map(lambda x: x.strftime('%Y-%m'))
     merged_quartiles = merged_allegation.merge(
@@ -82,7 +81,8 @@ def beat_quartile_complaints(
     officer_quartiles = pd.DataFrame(
         merged_quartiles.groupby(
             ['officer_id', 'quartile'])['allegation_id'].nunique()).reset_index()
-    total_years = (end_date_train - start_date_train) / np.timedelta64(1, 'Y')
+    total_years = (end_date_train - pd.to_datetime('01-01-2010')) / \
+        np.timedelta64(1, 'Y')
     officer_quartiles['allegation_id'] = officer_quartiles.id.map(
         lambda x: x / total_years)
     officer_quartiles = officer_quartiles.pivot_table(
