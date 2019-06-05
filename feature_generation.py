@@ -44,9 +44,9 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
         officer_df, feat_dict = create_tenure_var(officer_df, end_date_set,
                                                   feat_dict)
         print('tenure done')
-        #officer_df, feat_dict = gen_allegation_features(officer_df,
-        #                                                allegation_df,
-        #                                                end_date_set, feat_dict)
+        officer_df, feat_dict = gen_allegation_features(officer_df,
+                                                        allegation_df,
+                                                        end_date_set, feat_dict)
         print('allegations done')
 
         officer_df, feat_dict, newvars = gen_victim_features(officer_df,
