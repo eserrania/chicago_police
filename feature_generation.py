@@ -222,8 +222,8 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
     officer_df['pct_hispanic_victims'] = officer_df.hispanic_count / \
         officer_df.victim_count
 
-    officer.drop(columns=['black_count', 'white_count', 'api_count',
-                          'hispanic_count'], inplace=True)
+    officer_df.drop(columns=['black_count', 'white_count', 'api_count',
+                             'hispanic_count'], inplace=True)
 
     if train:
         scaler = MinMaxScaler()
