@@ -127,7 +127,7 @@ def create_race_dummies(officer_df, feat_dict, train=True):
     else:
         for val in feat_dict['race']:
             officer_df['race_{}'.format(val)] = [1 if race == val else 0
-                                                 for race in officers_df.race]
+                                                 for race in officer_df.race]
         return officer_df
 
 
@@ -200,6 +200,9 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
         victims = victim_filter[victim_filter.allegation_id == aid]
 
         cnt = len(victims)
+        if cnt > 0:
+            print(cnt)
+
         white = len(victims[victims.race == 'White'])
         black = len(victims[victims.race == 'Black'])
         hisp = len(victims[victims.race == 'Hispanic'])
