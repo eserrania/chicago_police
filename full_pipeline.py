@@ -1,6 +1,6 @@
 import read_data as rd
 import train_test as tt
-import feature_generation_2 as fg
+import feature_generation as fg
 import ml_loop as ml
 import pandas as pd
 import numpy as np
@@ -9,7 +9,7 @@ import crime_portal as cp
 
 
 
-class RawDfs:   
+class RawDfs:
     def __init__(self):
         self.trr_df = rd.create_df('trr_trr')
         self.officer_df = rd.create_df('officer')
@@ -75,52 +75,50 @@ class TrainTest:
         self.end_date_outcome = allegation_set.get('end_date_outcome')
         self.start_date_test = allegation_set.get('start_date_test')
         self.end_date_test = allegation_set.get('end_date_test')
+        self.feature_dict = None
+        self.feature_list = None
 
 
     def add_train_features(self, aug=False):
         ## need to add trr features
         if aug:
             train_df = self.aug['train']
-        else:
-            train_df = self.reg['train']
-        train_df = fg.generate_features(
-            train_df, rd.create_df('salary'),
-            self.allegation_set.get('train'),
-            self.end_train_date)
-        train_df = fg.create_sustained_outcome(
-            train_df, self.allegation_set.get('train'),
-            self.end_train_date)
-        train_df = train_df.dropna()
-        if aug:
-            ## add extra augmented features
+            train_df, feat_dict, feat_lst = \
+                fg.generate_features(train_df, self.allegation_set.get('train'),
+                                     self.trr_set.get('train'),
+                                     self.end_train_date,
+                                     augmented=aug)
             self.aug['train'] = train_df
         else:
+            train_df = self.reg['train']
+            train_df, feat_dict, feat_lst = \
+                fg.generate_features(train_df, self.allegation_set.get('train'),
+                                     self.trr_set.get('train'),
+                                     self.end_train_date)
             self.reg['train'] = train_df
-            pass
+
+        self.feature_dict = feat_dict
+        self.feature_list = feat_lst
+
 
     def add_test_features(self, aug=False):
-    ## need to add trr features
-    ## THIS WILL NEED TO BE EDITED SO CONTINUOUS FEATURES ARE SCALED TO TRAINING SET
-        self.reg['test'] = fg.generate_features(
-            self.reg['test'], rd.create_df('salary'),
-            self.allegation_set.get('test'),
-            self.allegation_set.get('end_date_outcome'))
-        self.reg['test'] = fg.create_sustained_outcome(
-            self.reg['test'], self.allegation_set.get('test'),
-            self.allegation_set.get('end_date_outcome'))
-        self.reg['test'] = self.reg['test'].dropna()
-'''
-    def run_loop(self):
-        #UPDATE THIS PART LATER TO BE MORE EFFICIENT
-        time_splits = self.allegation_set
-        time_splits['train'] = self.officer_train
-        time_splits['test'] = self.officer_test
-        self.output_df = ml.classifier_loop(
-            [time_splits], self.grid, self.clfs, self.metric_dict, self.label,
-            ['appointed_date', 'resignation_date'], self.metrics, plot=True, save=False)
-'''
+        if aug:
+            test_df = self.aug['test']
+            test_df = fg.generate_features(train_df,
+                                            self.allegation_set.get('test'),
+                                            self.trr_set.get('test'),
+                                            self.end_train_date,
+                                            train_test='test',
+                                            self.feature_dict,
+                                            augmented=aug)
+            self.aug['test'] = test_df
 
-
-
-
-
+        else:
+            test_df = self.aug['test']
+            test_df = fg.generate_features(train_df,
+                                            self.allegation_set.get('test'),
+                                            self.trr_set.get('test'),
+                                            self.end_train_date,
+                                            train_test='test',
+                                            self.feature_dict)
+            self.reg['test'] = test_df

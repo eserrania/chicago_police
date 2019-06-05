@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from statistics import mode
 
-def generate_features(officer_df, allegation_df, end_date_set, 
+def generate_features(officer_df, allegation_df, trr_df, end_date_set,
                       train_test='train', feat_dict=None, augmented=False):
     '''
 
@@ -15,6 +15,9 @@ def generate_features(officer_df, allegation_df, end_date_set,
     officer_df = create_sustained_outcome(officer_df, allegation_df,
                                           end_date_set)
     officer_df = create_gender_dummy(officer_df)
+    officer_df = used_firearm(officer_df, trr_df, end_date_set)
+    officers_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
+
 
 
     if train_test == 'train':
@@ -29,7 +32,7 @@ def generate_features(officer_df, allegation_df, end_date_set,
         officer_df, feat_dict = create_age_var(officer_df, end_date_set,
                                                feat_dict)
 
-        officer_df, feat_dict = create_tenure_var(officer_df, end_date_set 
+        officer_df, feat_dict = create_tenure_var(officer_df, end_date_set
                                                   feat_dict)
         officer_df, feat_dict = gen_allegation_features(officer_df,
                                                         allegation_df,
@@ -37,11 +40,11 @@ def generate_features(officer_df, allegation_df, end_date_set,
 
     if train_test == 'test':
         officer_df = create_race_dummies(officer_df, feat_dict, train=False)
-        officer_df = create_age_var(officer_df, end_date_set, feat_dict, 
+        officer_df = create_age_var(officer_df, end_date_set, feat_dict,
                                     train=False)
-        officer_df = create_tenure_var(officer_df, end_date_set, feat_dict, 
+        officer_df = create_tenure_var(officer_df, end_date_set, feat_dict,
                                        train=False)
-        officer_df = gen_allegation_features(officer_df, allegation_df, 
+        officer_df = gen_allegation_features(officer_df, allegation_df,
                                              end_date_set, feat_dict,
                                              train=False)
 
@@ -59,7 +62,7 @@ def generate_features(officer_df, allegation_df, end_date_set,
         if train_test == 'test':
             officer_df = gen_network_features(officer_df, network, feat_dict,
                                               train=False)
-    
+
     if train_test == 'train':
         return officer_df, feat_dict, features
 
@@ -80,20 +83,20 @@ def create_sustained_outcome(officer_df, allegation_df, end_date_set):
 
 def create_gender_dummy(officer_df):
     '''
-    Given the officers dataframe, convert the gender variable into a dummy. 
+    Given the officers dataframe, convert the gender variable into a dummy.
     '''
     officer_df = officer_df.fillna(value={gender: mode(officer_df.gender)})
     officer_df['gender'] = np.where(officer_df.gender == 'F', 1 , 0)
-    
+
     return officer_df
 
 
 def create_race_dummies(officer_df, feat_dict, train=True):
     '''
-    Given the officers dataframe, creates race dummies. 
+    Given the officers dataframe, creates race dummies.
     '''
     officer_df = officer_df.fillna(value={'race': 'unknown'})
-    officer_df.race = [race.lower().replace('/', '_').replace(' ', '') 
+    officer_df.race = [race.lower().replace('/', '_').replace(' ', '')
                        for race in officer_df.race]
     if train:
         newvars = []
@@ -118,7 +121,7 @@ def create_age_var(officer_df, end_date_set, feat_dict, train=True):
     Given the officers dataframe and the end date of the training data set,
         calculates the officer´s age at that time and scales it.
     '''
-            
+
     officer_df['age'] = [end_date_set.year - year
                          for year in officer_df.birth_year]
 
@@ -145,7 +148,7 @@ def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
     Given the officers dataframe and the end date of the training data set,
         calculates the officer´s tenure at that timee and scales it.
     '''
-    officer_df['tenure'] = [math.floor(((end_date_set - date).days) / 365.25) 
+    officer_df['tenure'] = [math.floor(((end_date_set - date).days) / 365.25)
                             for date in officer_df.appointed_date]
     officer_df = officer_df.fillna(value={'tenure': np.mean(officer_df.tenure)})
 
@@ -166,15 +169,15 @@ def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
 
 '''
 def create_rank_dummies(officer_df, salary_df, end_date_set):
-    
+
     Given the officers dataframe, their salary history and the end date of the
-        training data set creates dummy variables with the officer's rank at 
+        training data set creates dummy variables with the officer's rank at
         that time.
-    
+
     officer_df = officer_df.drop(columns=['rank'])
-    salary_df = salary_df[[ryear <= end_date_set.year 
+    salary_df = salary_df[[ryear <= end_date_set.year
                            for ryear in salary_df.year]]
-    salary_df = salary_df[[date <= end_date_set 
+    salary_df = salary_df[[date <= end_date_set
                            for date in salary_df.spp_date]]
     current_ranks = salary_df.groupby('officer_id')['year'].max().to_frame()
     current_ranks = current_ranks.merge(salary_df[['officer_id', 'rank',
@@ -183,18 +186,18 @@ def create_rank_dummies(officer_df, salary_df, end_date_set):
     officer_df = officer_df.merge(current_ranks, how='left', left_on='id',
                                   right_on='officer_id')
     officer_df = pd.get_dummies(officer_df, columns=['rank'])
-    
+
     return officer_df.drop(columns=['year'])
 '''
 
 def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
                             train=True):
     '''
-    Given the officers dataframe and the their complaint history, creates 
+    Given the officers dataframe and the their complaint history, creates
         variables with their complaint counts, percentage of officer complaints,
         and percentage of sustained complaints.
     '''
-    
+
     allegation_df = allegation_df[allegation_df.incident_date < end_date_set]
     allegation_df = allegation_df[allegation_df['officer_id']\
         .isin(officer_df.id.unique())]
@@ -202,19 +205,19 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
     officer_df['pct_officer_complaints'] = 0.0
     officer_df['pct_sustained_complaints'] = 0.0
     off_complaints = allegation_df[allegation_df.is_officer_complaint == True]\
-        .officer_id.value_counts()  
+        .officer_id.value_counts()
     sustained = allegation_df[allegation_df.final_finding == 'SU'].officer_id\
         .value_counts()
     count = allegation_df.officer_id.value_counts()
-    
-    
+
+
     for oid in allegation_df.officer_id.unique():
         officer_df.loc[officer_df.id == oid, 'number_complaints'] = count[oid]
-        
+
         if oid in off_complaints.index:
             officer_df.loc[officer_df.id == oid, 'pct_officer_complaints'] = \
             off_complaints[oid] / count[oid]
-        
+
         if oid in sustained.index:
             officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = \
             sustained[oid] / count[oid]
@@ -240,23 +243,23 @@ def create_coaccusals_network(allegation_df, end_date_set):
     '''
 
     G = nx.Graph()
-    
+
     allegations = allegation_df[allegation_df.incident_date \
                                 <= end_date_set].crid
 
     for aid in allegations.unique():
-        officers = allegation_df[allegation_df.crid == aid]    
+        officers = allegation_df[allegation_df.crid == aid]
         if len(officers) > 1:
             oids = officers.officer_id
             n = 0
             for oid in oids:
                 for oid_2 in oids[n:]:
-                    if oid != oid_2: 
+                    if oid != oid_2:
                         if (oid, oid_2) in G.edges():
                             G.edges[oid, oid_2]['count'] += 1
                             G.edges[oid, oid_2]['weight'] = 1 / \
                                 G.edges[oid, oid_2]['count']
-                        else: 
+                        else:
                             G.add_edge(oid, oid_2, count=1, weight=1)
                 n += 1
     return G
@@ -273,7 +276,7 @@ def add_investigators_network(network, investigators_df, allegation_df,
 
     for aid in allegations.unique():
         investigator = investigators_df[investigators_df.allegation_id == aid]
-        officers = allegation_df[allegation_df.crid == aid] 
+        officers = allegation_df[allegation_df.crid == aid]
         if (len(investigator) > 0) & (len(officers) > 0):
             inv_id = investigator.investigator_id
             off_id = officers.officer_id
@@ -326,7 +329,7 @@ def add_same_unit_network(network, history_df, end_date_set):
         n = 0
         for oid in oids:
             start_date = officers[officers.officer_id == oid]\
-                .effective_date.iloc[0] 
+                .effective_date.iloc[0]
             end_date = officers[officers.officer_id == oid].end_date.iloc[0]
 
             for oid_2 in oids[n:]:
@@ -341,12 +344,12 @@ def add_same_unit_network(network, history_df, end_date_set):
                                 network.edges[oid, oid_2]['weight'] = 1 / \
                                 network.edges[oid, oid_2]['count']
 
-                            else: 
+                            else:
                                 network.add_edge(oid, oid_2, count=1, weight=1)
 
                     else:
                         start_date2 = officers[officers.officer_id == oid_2]\
-                            .effective_date.iloc[0] 
+                            .effective_date.iloc[0]
                         end_date2 = officers[officers.officer_id == oid_2]\
                             .end_date.iloc[0]
 
@@ -357,7 +360,7 @@ def add_same_unit_network(network, history_df, end_date_set):
                                 network.edges[oid, oid_2]['weight'] = 1 / \
                                 network.edges[oid, oid_2]['count']
 
-                            else: 
+                            else:
                                 network.add_edge(oid, oid_2, count=1, weight=1)
             n += 1
 
@@ -409,7 +412,7 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
                     else:
                         shortest_firearm = length
 
-            
+
             if shortest_firearm:
                 officer_df.loc[officer_df.id == oid,
                                'shortest_path_shooting_officer'] = \
@@ -523,8 +526,3 @@ def gen_network_features(officer_df, network, feat_dict, train=True):
                 reshape(-1, 1))
 
         return officer_df
-
-
-
-
-
