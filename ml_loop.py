@@ -229,7 +229,7 @@ def create_output_df(metric_dict):
     '''
 
     # minimum columns for output dataframe
-    col_lst = ['model', 'importances', 'parameters', 'set', 'type', 'outcome' 'train_start', 'train_end',
+    col_lst = ['model', 'importances', 'parameters', 'set', 'type', 'outcome', 'train_start', 'train_end',
                'test_start', 'test_end']
     # dealing with evaluation metrics
     for metric, threshold_lst in metric_dict.items():
