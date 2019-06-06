@@ -110,7 +110,8 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                         else:
                             pred_probs = cl.predict_proba(X_test)[:, 1]
 
-                        importances = cl.feature_importances_
+                        importances = []
+                        #cl.feature_importances_
                         # update metrics dataframe
                         update_metrics_df(output_df, y_test, pred_probs, name, importances,
                                           p, st, ra, label, train_start, train_end,
