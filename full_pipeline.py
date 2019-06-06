@@ -103,7 +103,7 @@ class RawDfs:
                                 'outcome_time']:
                     print()
                     print(str(i) + str(date_val))
-                   for tt_sets in [self.allegation_sets[i],
+                    for tt_sets in [self.allegation_sets[i],
                                     self.trr_sets[i],
                                     self.salary_sets[i],
                                     self.investigator_sets[i],
@@ -150,14 +150,17 @@ class TrainTest:
     def add_train_features(self):
 
         self.train, self.feature_dict, self.reg_features, self.aug_features = \
-            fg.generate_features(self.train, self.allegation_set.get('train'),
+            fg.generate_features(self.train,
+                                 self.allegation_set.get('train'),
                                  self.trr_set.get('train'),
+                                 self.victim_set.get('train'),
                                  self.end_date_train)
 
     def add_test_features(self):
         self.test = fg.generate_features(self.test,
                                         self.allegation_set.get('test'),
                                         self.trr_set.get('test'),
+                                        self.victim_set.get('test'),
                                         self.end_date_train,
                                         train_test='test',
                                         feat_dict=self.feature_dict)
