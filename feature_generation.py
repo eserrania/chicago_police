@@ -1,3 +1,4 @@
+#import crime_portal as cp
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -17,10 +18,12 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
     print('sustained done')
     officer_df = create_gender_dummy(officer_df)
     print('gender done')
+    print('shooting officers in trrs: ',trr_df.groupby('firearm_used')['officer_id'].nunique())
     officer_df = used_firearm(officer_df, trr_df, end_date_set)
-    print('firearm done')
+    print('mean firearm_used: ', officer_df.used_firearm.mean())
     officer_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
-    print('firearm outcome done')
+    print('mean firearm_outcome: ', officer_df.firearm_outcome.mean())
+
 
 
 
@@ -51,15 +54,17 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
 
         officer_df, feat_dict, newvars = gen_victim_features(officer_df,
                                                              allegation_df,
-                                                             victim_df,
+                                                             victim_df, 
+                                                             end_date_set,
                                                              feat_dict)
         print('victims done')
 
         features += newvars
 
-
         officer_df, feat_dict, newvars = gen_network_features(officer_df,
+                                                              allegation_df,
                                                               network, 
+                                                              end_date_set,
                                                               feat_dict)
         print('network 2 done')
         features_aug = features[:] + newvars
@@ -78,9 +83,9 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                              end_date_set, feat_dict,
                                              train=False)
         officer_df = gen_victim_features(officer_df, allegation_df, victim_df,
-                                         feat_dict, train=False)
-        officer_df = gen_network_features(officer_df, network, feat_dict, 
-                                          train=False)
+                                         end_date_set, feat_dict, train=False)
+        officer_df = gen_network_features(officer_df, allegation_df, network, 
+                                          end_date_set, feat_dict, train=False)
         return officer_df
 
 
@@ -94,6 +99,19 @@ def create_sustained_outcome(officer_df, allegation_df, end_date_set):
     sustained = outcome_window.loc[outcome_window.final_finding == "SU"]
     officer_df['sustained_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(sustained.officer_id) else 0, axis=1)
+    return officer_df
+
+def create_firearm_outcome(officer_df, trr, end_date_set):
+    '''
+    Given the officers and trr dfs, creates an outcome column
+    indicating whether or not the officer used a firearm in the
+    outcome window.
+    '''
+    outcome_window = trr.loc[
+        trr.trr_datetime > end_date_set]
+    firearm_trrs = outcome_window.loc[outcome_window.firearm_used]
+    officer_df['firearm_outcome'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
     return officer_df
 
 def create_gender_dummy(officer_df):
@@ -183,8 +201,8 @@ def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
         return officer_df
 
 
-def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
-                        train=True):
+def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
+                        feat_dict, train=True):
     '''
     '''
     officer_df['victim_count'] = 0
@@ -196,6 +214,8 @@ def gen_victim_features(officer_df, allegation_df, victim_df, feat_dict,
     officer_df['pct_black_victims'] = 0.0
     officer_df['pct_api_victims'] = 0.0
     officer_df['pct_hispanic_victims'] = 0.0
+
+    allegation_df = allegation_df[allegation_df.incident_date <= end_date_set]
 
     allegs = allegation_df[allegation_df.officer_id.isin(officer_df.id)].crid
     victim_filter = victim_df[victim_df.allegation_id.isin(allegs)]
@@ -289,7 +309,7 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
         and percentage of sustained complaints.
     '''
 
-    allegation_df = allegation_df[allegation_df.incident_date < end_date_set]
+    allegation_df = allegation_df[allegation_df.incident_date <= end_date_set]
     allegation_df = allegation_df[allegation_df['officer_id']\
         .isin(officer_df.id.unique())]
     officer_df['number_complaints'] = 0
@@ -383,18 +403,7 @@ def add_investigators_network(network, investigators_df, allegation_df,
 
     return network
 
-def create_firearm_outcome(officer_df, trr, end_date_set):
-    '''
-    Given the officers and trr dfs, creates an outcome column
-    indicating whether or not the officer used a firearm in the
-    outcome window.
-    '''
-    outcome_window = trr.loc[
-        trr.trr_datetime > end_date_set]
-    firearm_trrs = outcome_window.loc[outcome_window.firearm_used]
-    officer_df['firearm_outcome'] = officer_df.apply(
-        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
-    return officer_df
+
 
 def used_firearm(officer_df, trr, end_date_set):
     '''
@@ -468,12 +477,14 @@ def create_network(allegation_df, investigators_df, history_df, end_date_set):
     return nw
 
 
-def gen_network_features(officer_df, network, feat_dict, train=True):
+def gen_network_features(officer_df, allegation_df, network, end_date_set,
+                         feat_dict, train=True):
     '''
     '''
 
     firearm_oid = officer_df[officer_df.used_firearm == 1].id.unique()
-    sustained_oid = officer_df[officer_df.sustained_outcome == 1].id.unique()
+    sustained_oid = allegation_df[allegation_df.final_finding == "SU"]\
+        .officer_id.unique()
 
     officer_df['shortest_path_shooting_officer'] = None
     officer_df['shortest_path_sustained_officer'] = None
