@@ -24,6 +24,10 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
     officer_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
     print('mean firearm_outcome: ', officer_df.firearm_outcome.mean())
 
+    print('total firearm use mean: ',
+           len(officer_df[(officer_df.firearm_outcome == 1) | \
+                          (officer_df.used_firearm == 1)])/len(officer_df))
+
 
 
 
