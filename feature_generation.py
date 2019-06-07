@@ -421,7 +421,8 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
 def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
                         feat_dict, train=True):
     '''
-    Generate a victim count per officer and scale it, as well as percentajer. 
+    Generate a victim count per officer and scale it, as well as percentages of 
+        victims per race. 
     '''
     officer_df['victim_count'] = 0
     officer_df['black_count'] = 0
@@ -502,6 +503,7 @@ def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
 
 def create_coaccusals_network(allegation_df, end_date_set):
     '''
+    Create a network of officers that have been coaccused together in the past.
     '''
 
     G = nx.Graph()
@@ -530,6 +532,7 @@ def create_coaccusals_network(allegation_df, end_date_set):
 def add_investigators_network(network, investigators_df, allegation_df,
                               end_date_set):
     '''
+    Add investigators to the officer network.
     '''
 
     investigators_df = investigators_df[investigators_df.officer_id.notnull()]
@@ -555,68 +558,21 @@ def add_investigators_network(network, investigators_df, allegation_df,
     return network
 
 
-def add_same_unit_network(network, history_df, end_date_set):
-    '''
-    '''
-    history = history_df[history_df.effective_date <= end_date_set]
-
-    for unit in history_df.unit_id.unique():
-        officers = history_df[history_df.unit_id == unit]
-        oids = officers.officer_id
-        n = 0
-        for oid in oids:
-            start_date = officers[officers.officer_id == oid]\
-                .effective_date.iloc[0]
-            end_date = officers[officers.officer_id == oid].end_date.iloc[0]
-
-            for oid_2 in oids[n:]:
-                if oid != oid_2:
-                    if type(end_date) is pd._libs.tslibs.nattype.NaTType:
-                        end_date2 = officers[officers.officer_id == oid_2]\
-                            .end_date.iloc[0]
-
-                        if not(end_date2 < start_date):
-                            if (oid, oid_2) in network.edges():
-                                network.edges[oid, oid_2]['count'] += 1
-                                network.edges[oid, oid_2]['weight'] = 1 / \
-                                network.edges[oid, oid_2]['count']
-
-                            else:
-                                network.add_edge(oid, oid_2, count=1, weight=1)
-
-                    else:
-                        start_date2 = officers[officers.officer_id == oid_2]\
-                            .effective_date.iloc[0]
-                        end_date2 = officers[officers.officer_id == oid_2]\
-                            .end_date.iloc[0]
-
-                        if not ((start_date2 > end_date) | \
-                            (end_date2 < start_date)):
-                            if (oid, oid_2) in network.edges():
-                                network.edges[oid, oid_2]['count'] += 1
-                                network.edges[oid, oid_2]['weight'] = 1 / \
-                                network.edges[oid, oid_2]['count']
-
-                            else:
-                                network.add_edge(oid, oid_2, count=1, weight=1)
-            n += 1
-
-    return network
-
 
 def create_network(allegation_df, investigators_df, history_df, end_date_set):
     '''
+    Create a network of coaccusals and investigations among police officers.
     '''
     nw = create_coaccusals_network(allegation_df, end_date_set)
     nw = add_investigators_network(nw, investigators_df, allegation_df,
                                    end_date_set)
-    #nw = add_same_unit_network(nw, history_df, end_date_set)
     return nw
 
 
 def gen_network_features(officer_df, allegation_df, network, end_date_set,
                          feat_dict, train=True):
     '''
+    Generate features from a previously created network of police officers.
     '''
 
     firearm_oid = officer_df[officer_df.used_firearm == 1].id.unique()
