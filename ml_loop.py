@@ -66,16 +66,16 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
     # create output dataframe
     output_df = create_output_df(metric_dict)
     best_mods = {}
-    best_precision = 0
-    best_prec_dict = {}
-    #loops through classifier dictionary
-    for name, clfr in clfrs.items():
-        param_vals = params[name]
+
+    # loop through TrainTest object list
+    for st, obj in enumerate(set_lst):
+        best_precision = 0
+        best_prec_dict = {}
         # unpack the list of parameters and then run loop on combination
-        for i_p, p in enumerate(list(ParameterGrid(param_vals))):
-            # print(p)
-            # loop through TrainTest object list
-            for st, obj in enumerate(set_lst):
+        for name, clfr in clfrs.items():
+            param_vals = params[name]
+            # loops through classifier dictionary
+            for i_p, p in enumerate(list(ParameterGrid(param_vals))):
                 reg_lst = obj.reg_features
                 aug_lst = obj.aug_features
                 net_lst = list(set(aug_lst) - set(reg_lst))
@@ -137,7 +137,7 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                             best_precision = cur_prec_5
                             best_prec_dict = {'best_prec': best_precision,
                                              'predicted_probs': pred_probs,
-                                             'label': label,
+                                             'label': test[label],
                                              'officer_id': test.id}
                         if plot:
                             plot_precision_recall_n(y_test, pred_probs, name, plot)
