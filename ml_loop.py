@@ -39,7 +39,7 @@ SEED = 84
 ################################################################################
 
 def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
-                    metrics, plot=False, save=None):
+                    metrics, csv_name, plot=False):
     '''
     Loops through the classifiers, parameters and train-test pairs and saves
     the results into a pandas dataframe.
@@ -70,12 +70,16 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
     for name, clfr in clfrs.items():
         param_vals = params[name]
         # unpack the list of parameters and then run loop on combination
-        for p in ParameterGrid(param_vals):
+        for i_p, p in enumerate(list(ParameterGrid(param_vals))):
             #print(p)
             # loop through TrainTest object list
             for st, obj in enumerate(set_lst):
-                reg_aug_dict = {'regular': obj.reg_features,
-                                'augmented': obj.aug_features}
+                reg_lst = obj.reg_features
+                aug_lst = obj.aug_features
+                net_lst = list(set(aug_lst) - set(reg_lst))
+                reg_aug_dict = {'regular': reg_lst,
+                                'augmented': aug_lst,
+                                'network': net_lst}
                 for ra, feat_lst in reg_aug_dict.items():
                     # labels: ['firearm_outcome', 'sustained_outcome']
                     for label in label_lst:
@@ -110,17 +114,25 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                         else:
                             pred_probs = cl.predict_proba(X_test)[:, 1]
 
-                        importances = []
-                        #cl.feature_importances_
+                        if name == 'Bagging':
+                            # https://stackoverflow.com/questions/44333573/feature-importances-bagging-scikit-learn
+                            importances = np.mean([
+                                          tree.feature_importances_ for tree
+                                          in cl.estimators_], axis=0)
+                        elif name == 'LogisticRegression':
+                            # https://stackoverflow.com/questions/34052115/how-to-find-the-importance-of-the-features-for-a-logistic-regression-model
+                            importances = cl.coef_
+                        else:
+                            importances = cl.feature_importances_
                         # update metrics dataframe
                         update_metrics_df(output_df, y_test, pred_probs, name, importances,
-                                          p, st, ra, label, train_start, train_end,
+                                          i_p, p, st, ra, label, train_start, train_end,
                                           test_start, test_end, metrics)
                         if plot:
                             plot_precision_recall_n(y_test, pred_probs, name, plot)
 
-    if save:
-        output_df.to_csv(file_name)
+    if csv_name:
+        output_df.to_csv(csv_name)
 
     return output_df
 
@@ -230,7 +242,7 @@ def create_output_df(metric_dict):
     '''
 
     # minimum columns for output dataframe
-    col_lst = ['model', 'importances', 'parameters', 'set', 'type', 'outcome', 'train_start', 'train_end',
+    col_lst = ['model', 'importances', 'param_set', 'parameters', 'set', 'type', 'outcome', 'train_start', 'train_end',
                'test_start', 'test_end']
     # dealing with evaluation metrics
     for metric, threshold_lst in metric_dict.items():
@@ -244,7 +256,7 @@ def create_output_df(metric_dict):
 
     return output_df
 
-def update_metrics_df(output_df, y_test, pred_probs, name, importances, parameters, st, ra,
+def update_metrics_df(output_df, y_test, pred_probs, name, importances, i_p, parameters, st, ra,
                       label, train_start, train_end, test_start, test_end, metrics):
     '''
     Updates metrics dataframe
@@ -255,7 +267,7 @@ def update_metrics_df(output_df, y_test, pred_probs, name, importances, paramete
         - pred_probs:
     '''
     # minimum columns to identify model
-    result_lst = [name, importances, parameters, st, ra, label, train_start, train_end,
+    result_lst = [name, importances, i_p, parameters, st, ra, label, train_start, train_end,
                   test_start, test_end]
 
     # list of columns to fill in metrics for
