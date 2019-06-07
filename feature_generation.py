@@ -1,3 +1,11 @@
+"""
+CAPP 30254: Final project
+
+
+This file contains the feature generation functions.
+
+"""
+
 import crime_portal as cp
 import pandas as pd
 import numpy as np
@@ -7,11 +15,13 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from statistics import mode
 
+
 def generate_features(officer_df, allegation_df, trr_df, victim_df,
                       salary_df, history_df, end_date_set, train_test='train',
                       feat_dict=None):
     '''
-    Generates the features.
+    Generates the features needed for the machine learning pipeline,
+        differentiating between training and testing sets.
     '''
 
     officer_df = create_sustained_outcome(officer_df, allegation_df,
@@ -25,7 +35,7 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
     if train_test == 'train':
         features = ['gender', 'age', 'tenure', 'number_complaints',
                     'pct_officer_complaints', 'pct_sustained_complaints',
-                    'disciplined_before', 'trr_count', 'shooting_count']
+                    'disciplined_before', 'trr_report_count', 'shooting_count']
         feat_dict = {}
 
         officer_df, feat_dict, newvars = create_race_dummies(officer_df,
@@ -310,10 +320,9 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
     '''
     trr = trr_df[trr_df.trr_datetime <= end_date_set]
     trr = trr[trr.officer_id.isin(officer_df.id.unique())]
-    officers = officer_df.drop(columns='trr_count')
 
     trr_count = trr.groupby('officer_id').size().to_frame().reset_index()\
-        .rename(columns={0: 'trr_count'})
+        .rename(columns={0: 'trr_report_count'})
 
     officers = officers.merge(trr_count, how='left', left_on='id',
                                   right_on='officer_id')
@@ -323,27 +332,28 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
     officers = officers.merge(firearm, how='left', left_on='id',
                                   right_on='officer_id')
 
-    officers = officers.fillna(value={'trr_count': 0, 'shooting_count': 0})
+    officers = officers.fillna(value={'trr_report_count': 0,
+            'shooting_count': 0})
 
 
     if train:
         scaler_1 = MinMaxScaler()
         scaler_2 = MinMaxScaler()
 
-        officers['trr_count'] = scaler_1.fit_transform(\
-            np.array(officers['trr_count']).reshape(-1, 1))
+        officers['trr_report_count'] = scaler_1.fit_transform(\
+            np.array(officers['trr_report_count']).reshape(-1, 1))
         officers['shooting_count'] = scaler_2.fit_transform(\
             np.array(officers['shooting_count']).reshape(-1, 1))
         
-        feat_dict['trr_count'] = scaler_1
+        feat_dict['trr_report_count'] = scaler_1
         feat_dict['shooting_count'] = scaler_2
 
         return office, feat_dict
 
     else:
-        scaler_1 = feat_dict['trr_count']
-        officers['trr_count'] = scaler_1.transform(\
-            np.array(officers['trr_count']).reshape(-1, 1))
+        scaler_1 = feat_dict['trr_report_count']
+        officers['trr_report_count'] = scaler_1.transform(\
+            np.array(officers['trr_report_count']).reshape(-1, 1))
 
         scaler_2 = feat_dict['shooting_count']
         officers['shooting_count'] = scaler_2.transform(\
