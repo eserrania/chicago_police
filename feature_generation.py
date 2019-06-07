@@ -108,7 +108,6 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                           feat_dict, train=False)
         officer_df = gen_unit_dummies(officer_df, history_df, end_date_set,
                                       feat_dict, train=False)
-        features += newvars 
         officer_df = gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict,
                                     train=False) 
         officer_df = gen_allegation_features(officer_df, allegation_df,
@@ -328,6 +327,8 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
     officer_df = officer_df.merge(trr_count, how='left', left_on='id',
                                   right_on='officer_id')
+    print(officer_df.trr_report_count.describe())
+
 
     firearm = trr[trr.firearm_used == True].groupby('officer_id').size()\
         .to_frame().reset_index().rename(columns={0: 'shooting_count'})
@@ -336,6 +337,7 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
     officer_df = officer_df.fillna(value={'trr_report_count': 0,
             'shooting_count': 0})
+    print(officer_df.trr_report_count.describe())
 
 
     if train:
@@ -344,6 +346,7 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
         officer_df['trr_report_count'] = scaler_1.fit_transform(\
             np.array(officer_df['trr_report_count']).reshape(-1, 1))
+
         officer_df['shooting_count'] = scaler_2.fit_transform(\
             np.array(officer_df['shooting_count']).reshape(-1, 1))
         
