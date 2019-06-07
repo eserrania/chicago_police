@@ -324,15 +324,15 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
     trr_count = trr.groupby('officer_id').size().to_frame().reset_index()\
         .rename(columns={0: 'trr_report_count'})
 
-    officers = officers.merge(trr_count, how='left', left_on='id',
+    officer_df = officer_df.merge(trr_count, how='left', left_on='id',
                                   right_on='officer_id')
 
     firearm = trr[trr.firearm_used == True].groupby('officer_id').size()\
         .to_frame().reset_index().rename(columns={0: 'shooting_count'})
-    officers = officers.merge(firearm, how='left', left_on='id',
+    officer_df = officer_df.merge(firearm, how='left', left_on='id',
                                   right_on='officer_id')
 
-    officers = officers.fillna(value={'trr_report_count': 0,
+    officer_df = officer_df.fillna(value={'trr_report_count': 0,
             'shooting_count': 0})
 
 
@@ -340,10 +340,10 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
         scaler_1 = MinMaxScaler()
         scaler_2 = MinMaxScaler()
 
-        officers['trr_report_count'] = scaler_1.fit_transform(\
-            np.array(officers['trr_report_count']).reshape(-1, 1))
-        officers['shooting_count'] = scaler_2.fit_transform(\
-            np.array(officers['shooting_count']).reshape(-1, 1))
+        officer_df['trr_report_count'] = scaler_1.fit_transform(\
+            np.array(officer_df['trr_report_count']).reshape(-1, 1))
+        officer_df['shooting_count'] = scaler_2.fit_transform(\
+            np.array(officer_df['shooting_count']).reshape(-1, 1))
         
         feat_dict['trr_report_count'] = scaler_1
         feat_dict['shooting_count'] = scaler_2
@@ -352,14 +352,14 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
     else:
         scaler_1 = feat_dict['trr_report_count']
-        officers['trr_report_count'] = scaler_1.transform(\
-            np.array(officers['trr_report_count']).reshape(-1, 1))
+        officer_df['trr_report_count'] = scaler_1.transform(\
+            np.array(officer_df['trr_report_count']).reshape(-1, 1))
 
         scaler_2 = feat_dict['shooting_count']
-        officers['shooting_count'] = scaler_2.transform(\
-            np.array(officers['shooting_count']).reshape(-1, 1))
+        officer_df['shooting_count'] = scaler_2.transform(\
+            np.array(officer_df['shooting_count']).reshape(-1, 1))
 
-        return officers
+        return officer_df
 
 
 
