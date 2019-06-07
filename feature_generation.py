@@ -376,9 +376,11 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
     allegation_df = allegation_df[allegation_df.incident_date <= end_date_set]
     allegation_df = allegation_df[allegation_df['officer_id']\
         .isin(officer_df.id.unique())]
+    allegation_df['disciplined'] = np.where(allegation_df.disciplined == 'true',
+                                            True, False)
     allegation_df = allegation_df.fillna(value={'disciplined': False})
-    print(allegation_df.disciplined.describe())
-    print(allegation_df.disciplined.value_counts())
+
+
     disciplined = allegation_df[allegation_df.disciplined].officer_id.unique()
 
     officer_df['disciplined_before'] = [1 if oid in disciplined else 0 
