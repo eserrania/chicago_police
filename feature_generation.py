@@ -365,8 +365,6 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
 
 
-
-
 def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
                             train=True):
     '''
@@ -379,6 +377,8 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
     allegation_df = allegation_df[allegation_df['officer_id']\
         .isin(officer_df.id.unique())]
     allegation_df = allegation_df.fillna(value={'disciplined': False})
+    print(allegation_df.disciplined.describe())
+    print(allegation_df.disciplined.value_counts())
     disciplined = allegation_df[allegation_df.disciplined].officer_id.unique()
 
     officer_df['disciplined_before'] = [1 if oid in disciplined else 0 
