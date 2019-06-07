@@ -8,7 +8,7 @@ from sklearn.preprocessing import MinMaxScaler
 from statistics import mode
 
 def generate_features(officer_df, allegation_df, trr_df, victim_df,
-                      salary_df, end_date_set, train_test='train',
+                      salary_df, history_df, end_date_set, train_test='train',
                       feat_dict=None):
     '''
     Generates featur
@@ -16,24 +16,12 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
 
     officer_df = create_sustained_outcome(officer_df, allegation_df,
                                           end_date_set)
-    print('sustained done')
     officer_df = create_gender_dummy(officer_df)
-    print('gender done')
-    print('shooting officers in trrs: ',trr_df.groupby('firearm_used')['officer_id'].nunique())
+  
     officer_df = used_firearm(officer_df, trr_df, end_date_set)
-    print('mean firearm_used: ', officer_df.used_firearm.mean())
     officer_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
-    print('mean firearm_outcome: ', officer_df.firearm_outcome.mean())
-
-    print('total firearm use mean: ',
-           len(officer_df[(officer_df.firearm_outcome == 1) | \
-                          (officer_df.used_firearm == 1)])/len(officer_df))
-
-
-
 
     network =  create_coaccusals_network(allegation_df, end_date_set)
-    print('network done')
 
     if train_test == 'train':
         features = ['gender', 'age', 'tenure', 'number_complaints',
@@ -42,34 +30,28 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
 
         officer_df, feat_dict, newvars = create_race_dummies(officer_df,
                                                              feat_dict)
-        print('race done')
         features += newvars
 
         officer_df, feat_dict = create_age_var(officer_df, end_date_set,
                                                feat_dict)
-        print('age_done')
 
         officer_df, feat_dict = create_tenure_var(officer_df, end_date_set,
                                                   feat_dict)
-        print('tenure done')
         officer_df, feat_dict = gen_allegation_features(officer_df,
                                                         allegation_df,
                                                         end_date_set, feat_dict)
-        print('allegations done')
 
         officer_df, feat_dict, newvars = create_rank_dummies(officer_df,
                                                              salary_df,
                                                              end_date_set,
                                                              feat_dict)
         features += newvars
-        print('rank done')
 
         officer_df, feat_dict, newvars = gen_victim_features(officer_df,
                                                              allegation_df,
                                                              victim_df, 
                                                              end_date_set,
                                                              feat_dict)
-        print('victims done')
 
         features += newvars
 
@@ -77,21 +59,18 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                                            end_date_set,
                                                            feat_dict)
         features += newvars
-        print('beat_quartile_trrs done')
 
         officer_df, feat_dict, newvars = cp.beat_quartile_complaints(officer_df,
                                                                   allegation_df,
                                                                   end_date_set,
                                                                   feat_dict)
         features += newvars
-        print('beat_quartile_complaints done')
 
         officer_df, feat_dict, newvars = gen_network_features(officer_df,
                                                               allegation_df,
                                                               network, 
                                                               end_date_set,
                                                               feat_dict)
-        print('network 2 done')
         features_aug = features[:] + newvars
 
         return officer_df, feat_dict, features, features_aug
@@ -106,7 +85,6 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                        train=False)
         officer_df  = create_rank_dummies(officer_df, salary_df, end_date_set,
                                           feat_dict, train=False)
-        features += newvars
         officer_df = gen_allegation_features(officer_df, allegation_df,
                                              end_date_set, feat_dict,
                                              train=False)
@@ -340,7 +318,7 @@ def create_rank_dummies(officer_df, salary_df, end_date_set, feat_dict,
     else:
         for val in feat_dict['rank']:
             officer_df['rank_{}'.format(val)] = [1 if rank == val else 0
-                                                 for rank in officer_df.rank]
+                                                 for rank in officer_df['rank']]
         return officer_df
 
 
