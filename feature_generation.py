@@ -1,4 +1,4 @@
-#import crime_portal as cp
+import crime_portal as cp
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -8,9 +8,10 @@ from sklearn.preprocessing import MinMaxScaler
 from statistics import mode
 
 def generate_features(officer_df, allegation_df, trr_df, victim_df,
-                      end_date_set, train_test='train', feat_dict=None):
+                      salary_df, end_date_set, train_test='train',
+                      feat_dict=None):
     '''
-
+    Generates featur
     '''
 
     officer_df = create_sustained_outcome(officer_df, allegation_df,
@@ -56,6 +57,13 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                                         end_date_set, feat_dict)
         print('allegations done')
 
+        officer_df, feat_dict, newvars = create_rank_dummies(officer_df,
+                                                             salary_df,
+                                                             end_date_set,
+                                                             feat_dict)
+        features += newvars
+        print('rank done')
+
         officer_df, feat_dict, newvars = gen_victim_features(officer_df,
                                                              allegation_df,
                                                              victim_df, 
@@ -64,6 +72,19 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
         print('victims done')
 
         features += newvars
+
+        officer_df, feat_dict, newvars = cp.beat_quartile_trrs(officer_df, trr_df,
+                                                           end_date_set,
+                                                           feat_dict)
+        features += newvars
+        print('beat_quartile_trrs done')
+
+        officer_df, feat_dict, newvars = cp.beat_quartile_complaints(officer_df,
+                                                                  allegation_df,
+                                                                  end_date_set,
+                                                                  feat_dict)
+        features += newvars
+        print('beat_quartile_complaints done')
 
         officer_df, feat_dict, newvars = gen_network_features(officer_df,
                                                               allegation_df,
@@ -83,11 +104,20 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                     train=False)
         officer_df = create_tenure_var(officer_df, end_date_set, feat_dict,
                                        train=False)
+        officer_df  = create_rank_dummies(officer_df, salary_df, end_date_set,
+                                          feat_dict, train=False)
+        features += newvars
         officer_df = gen_allegation_features(officer_df, allegation_df,
                                              end_date_set, feat_dict,
                                              train=False)
         officer_df = gen_victim_features(officer_df, allegation_df, victim_df,
                                          end_date_set, feat_dict, train=False)
+        officer_df = cp.beat_quartile_trrs(officer_df, trr_df, end_date_set, 
+                                        feat_dict, train=False)
+
+        officer_df = cp.beat_quartile_complaints(officer_df, allegation_df, 
+                                              end_date_set, feat_dict,
+                                              train=False)
         officer_df = gen_network_features(officer_df, allegation_df, network, 
                                           end_date_set, feat_dict, train=False)
         return officer_df
@@ -282,28 +312,37 @@ def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
         return officer_df
 
 
-'''
-def create_rank_dummies(officer_df, salary_df, end_date_set):
 
+def create_rank_dummies(officer_df, salary_df, end_date_set, feat_dict,
+                        train=True):
+    '''
     Given the officers dataframe, their salary history and the end date of the
         training data set creates dummy variables with the officer's rank at
         that time.
-
+    '''
     officer_df = officer_df.drop(columns=['rank'])
-    salary_df = salary_df[[ryear <= end_date_set.year
-                           for ryear in salary_df.year]]
-    salary_df = salary_df[[date <= end_date_set
-                           for date in salary_df.spp_date]]
-    current_ranks = salary_df.groupby('officer_id')['year'].max().to_frame()
-    current_ranks = current_ranks.merge(salary_df[['officer_id', 'rank',
-                                                   'year']],
-                                        on=['officer_id', 'year'], how='left')
-    officer_df = officer_df.merge(current_ranks, how='left', left_on='id',
+    salary = salary_df.loc[salary_df.year == end_date_set.year,
+                           ['officer_id', 'rank']]
+    officer_df = officer_df.merge(salary, how='left', left_on='id',
                                   right_on='officer_id')
-    officer_df = pd.get_dummies(officer_df, columns=['rank'])
+    officer_df = officer_df.fillna(value={'rank': 'unknown'})
 
-    return officer_df.drop(columns=['year'])
-'''
+    if train:
+        newvars = []
+        values = officer_df['rank'].unique()
+        feat_dict['rank'] = values
+        officer_df = pd.get_dummies(officer_df, columns=['rank'])
+        for val in values:
+            varname = 'rank_{}'.format(val)
+            newvars.append(varname)
+        return officer_df, feat_dict, newvars
+
+    else:
+        for val in feat_dict['rank']:
+            officer_df['rank_{}'.format(val)] = [1 if rank == val else 0
+                                                 for rank in officer_df.rank]
+        return officer_df
+
 
 def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
                             train=True):
@@ -337,7 +376,6 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
             officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = \
             sustained[oid] / count[oid]
 
-    #internal_allegation_percentile
     if train:
         scaler = MinMaxScaler()
         officer_df['number_complaints'] = scaler.fit_transform(\
