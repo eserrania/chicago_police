@@ -11,21 +11,21 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                       salary_df, history_df, end_date_set, train_test='train',
                       feat_dict=None):
     '''
-    Generates featur
+    Generates the features.
     '''
 
     officer_df = create_sustained_outcome(officer_df, allegation_df,
                                           end_date_set)
-    officer_df = create_gender_dummy(officer_df)
-  
     officer_df = used_firearm(officer_df, trr_df, end_date_set)
     officer_df = create_firearm_outcome(officer_df, trr_df, end_date_set)
+    officer_df = create_gender_dummy(officer_df)
 
     network =  create_coaccusals_network(allegation_df, end_date_set)
 
     if train_test == 'train':
         features = ['gender', 'age', 'tenure', 'number_complaints',
-                    'pct_officer_complaints', 'pct_sustained_complaints']
+                    'pct_officer_complaints', 'pct_sustained_complaints',
+                    'disciplined_before', 'trr_count', 'shooting_count']
         feat_dict = {}
 
         officer_df, feat_dict, newvars = create_race_dummies(officer_df,
@@ -37,9 +37,6 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
 
         officer_df, feat_dict = create_tenure_var(officer_df, end_date_set,
                                                   feat_dict)
-        officer_df, feat_dict = gen_allegation_features(officer_df,
-                                                        allegation_df,
-                                                        end_date_set, feat_dict)
 
         officer_df, feat_dict, newvars = create_rank_dummies(officer_df,
                                                              salary_df,
@@ -47,12 +44,26 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                                              feat_dict)
         features += newvars
 
+        officer_df, feat_dict, newvars = gen_unit_dummies(officer_df,
+                                                          history_df,
+                                                          end_date_set,
+                                                          feat_dict)
+        features += newvars   
+
+        officer_df, feat_dict = gen_trr_counts(officer_df, trr_df, end_date_set,
+                                               feat_dict)     
+
+        officer_df, feat_dict = gen_allegation_features(officer_df,
+                                                        allegation_df,
+                                                        end_date_set, feat_dict)
+
+
+
         officer_df, feat_dict, newvars = gen_victim_features(officer_df,
                                                              allegation_df,
                                                              victim_df, 
                                                              end_date_set,
                                                              feat_dict)
-
         features += newvars
 
         officer_df, feat_dict, newvars = cp.beat_quartile_trrs(officer_df, trr_df,
@@ -85,6 +96,11 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                        train=False)
         officer_df  = create_rank_dummies(officer_df, salary_df, end_date_set,
                                           feat_dict, train=False)
+        officer_df = gen_unit_dummies(officer_df, history_df, end_date_set,
+                                      feat_dict, train=False)
+        features += newvars 
+        officer_df = gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict,
+                                    train=False) 
         officer_df = gen_allegation_features(officer_df, allegation_df,
                                              end_date_set, feat_dict,
                                              train=False)
@@ -113,6 +129,20 @@ def create_sustained_outcome(officer_df, allegation_df, end_date_set):
         lambda x: 1 if x['id'] in list(sustained.officer_id) else 0, axis=1)
     return officer_df
 
+
+def used_firearm(officer_df, trr, end_date_set):
+    '''
+    Dummy for identifying officers who used a firearm in the training
+    period.
+    '''
+    train_window = trr.loc[
+        trr.trr_datetime <= end_date_set]
+    firearm_trrs = train_window.loc[train_window.firearm_used]
+    officer_df['used_firearm'] = officer_df.apply(
+        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
+    return officer_df
+
+
 def create_firearm_outcome(officer_df, trr, end_date_set):
     '''
     Given the officers and trr dfs, creates an outcome column
@@ -125,6 +155,7 @@ def create_firearm_outcome(officer_df, trr, end_date_set):
     officer_df['firearm_outcome'] = officer_df.apply(
         lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
     return officer_df
+
 
 def create_gender_dummy(officer_df):
     '''
@@ -212,6 +243,168 @@ def create_tenure_var(officer_df, end_date_set, feat_dict, train=True):
 
         return officer_df
 
+def create_rank_dummies(officer_df, salary_df, end_date_set, feat_dict,
+                        train=True):
+    '''
+    Given the officers dataframe, their salary history and the end date of the
+        training data set creates dummy variables with the officer's rank at
+        that time.
+    '''
+    officer_df = officer_df.drop(columns=['rank'])
+    salary = salary_df.loc[salary_df.year == end_date_set.year,
+                           ['officer_id', 'rank']]
+    officer_df = officer_df.merge(salary, how='left', left_on='id',
+                                  right_on='officer_id')
+    officer_df = officer_df.fillna(value={'rank': 'unknown'})
+
+    if train:
+        newvars = []
+        values = officer_df['rank'].unique()
+        feat_dict['rank'] = values
+        officer_df = pd.get_dummies(officer_df, columns=['rank'])
+        for val in values:
+            varname = 'rank_{}'.format(val)
+            newvars.append(varname)
+        return officer_df, feat_dict, newvars
+
+    else:
+        for val in feat_dict['rank']:
+            officer_df['rank_{}'.format(val)] = [1 if rank == val else 0
+                                                 for rank in officer_df['rank']]
+        return officer_df
+
+def gen_unit_dummies(officer_df, history_df, end_date_set, feat_dict,
+                     train=True):
+    '''
+    Generate dummies indicating the officer's unit at the end of the end date
+        of the data set.
+    '''
+
+    history = history_df[(history_df.effective_date <= end_date_set)]
+    history = history.groupby('officer_id')['effective_date',
+                                            'unit_id'].max().reset_index()
+    history.drop(columns=['effective_date'], inplace=True)
+    officer_df = officer_df.merge(history, how='left', left_on='id',
+                                  right_on='officer_id')
+    if train:
+        newvars = []
+        values = officer_df['unit_id'].unique()
+        feat_dict['unit_id'] = values
+        officer_df = pd.get_dummies(officer_df, columns=['unit_id'])
+        for val in values:
+            varname = 'unit_id_{}'.format(val)
+            newvars.append(varname)
+        return officer_df, feat_dict, newvars
+
+    else:
+        for val in feat_dict['unit_id']:
+            officer_df['unit_id_{}'.format(val)] = [1 if unit == val else 0
+                                                    for unit in 
+                                                    officer_df['unit_id']]
+        return officer_df
+
+
+
+def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
+    '''
+    '''
+    trr = trr_df[trr_df.trr_datetime <= end_date_set]
+    trr = trr[trr.officer_id.isin(officer_df.id.unique())]
+    officers = officer_df.drop(columns='trr_count')
+
+    trr_count = trr.groupby('officer_id').size().to_frame().reset_index()\
+        .rename(columns={0: 'trr_count'})
+
+    officers = officers.merge(trr_count, how='left', left_on='id',
+                                  right_on='officer_id')
+
+    firearm = trr[trr.firearm_used == True].groupby('officer_id').size()\
+        .to_frame().reset_index().rename(columns={0: 'shooting_count'})
+    officers = officers.merge(firearm, how='left', left_on='id',
+                                  right_on='officer_id')
+
+    officers = officers.fillna(value={'trr_count': 0, 'shooting_count': 0})
+
+
+    if train:
+        scaler_1 = MinMaxScaler()
+        scaler_2 = MinMaxScaler()
+
+        officers['trr_count'] = scaler_1.fit_transform(\
+            np.array(officers['trr_count']).reshape(-1, 1))
+        officers['shooting_count'] = scaler_2.fit_transform(\
+            np.array(officers['shooting_count']).reshape(-1, 1))
+        
+        feat_dict['trr_count'] = scaler_1
+        feat_dict['shooting_count'] = scaler_2
+
+        return office, feat_dict
+
+    else:
+        scaler_1 = feat_dict['trr_count']
+        officers['trr_count'] = scaler_1.transform(\
+            np.array(officers['trr_count']).reshape(-1, 1))
+
+        scaler_2 = feat_dict['shooting_count']
+        officers['shooting_count'] = scaler_2.transform(\
+            np.array(officers['shooting_count']).reshape(-1, 1))
+
+        return officers
+
+
+
+
+
+def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
+                            train=True):
+    '''
+    Given the officers dataframe and the their complaint history, creates
+        variables with their complaint counts, percentage of officer complaints,
+        and percentage of sustained complaints.
+    '''
+
+    allegation_df = allegation_df[allegation_df.incident_date <= end_date_set]
+    allegation_df = allegation_df[allegation_df['officer_id']\
+        .isin(officer_df.id.unique())]
+    allegation_df = allegation_df.fillna(value={'disciplined': False})
+    disciplined = allegation_df[allegation_df.disciplined].officer_id.unique()
+
+    officer_df['disciplined_before'] = [1 if oid in disciplined else 0 
+                                        for oid in officer_df.id]
+    officer_df['number_complaints'] = 0
+    officer_df['pct_officer_complaints'] = 0.0
+    officer_df['pct_sustained_complaints'] = 0.0
+    off_complaints = allegation_df[allegation_df.is_officer_complaint == True]\
+        .officer_id.value_counts()
+    sustained = allegation_df[allegation_df.final_finding == 'SU'].officer_id\
+        .value_counts()
+    count = allegation_df.officer_id.value_counts()
+
+
+    for oid in allegation_df.officer_id.unique():
+        officer_df.loc[officer_df.id == oid, 'number_complaints'] = count[oid]
+
+        if oid in off_complaints.index:
+            officer_df.loc[officer_df.id == oid, 'pct_officer_complaints'] = \
+            off_complaints[oid] / count[oid]
+
+        if oid in sustained.index:
+            officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = \
+            sustained[oid] / count[oid]
+
+    if train:
+        scaler = MinMaxScaler()
+        officer_df['number_complaints'] = scaler.fit_transform(\
+            np.array(officer_df['number_complaints']).reshape(-1, 1))
+        feat_dict['number_complaints'] = scaler
+
+        return officer_df, feat_dict
+
+    else:
+        scaler = feat_dict['number_complaints']
+        officer_df['number_complaints'] = scaler.transform(\
+            np.array(officer_df['number_complaints']).reshape(-1, 1))
+        return officer_df
 
 def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
                         feat_dict, train=True):
@@ -291,82 +484,7 @@ def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
 
 
 
-def create_rank_dummies(officer_df, salary_df, end_date_set, feat_dict,
-                        train=True):
-    '''
-    Given the officers dataframe, their salary history and the end date of the
-        training data set creates dummy variables with the officer's rank at
-        that time.
-    '''
-    officer_df = officer_df.drop(columns=['rank'])
-    salary = salary_df.loc[salary_df.year == end_date_set.year,
-                           ['officer_id', 'rank']]
-    officer_df = officer_df.merge(salary, how='left', left_on='id',
-                                  right_on='officer_id')
-    officer_df = officer_df.fillna(value={'rank': 'unknown'})
 
-    if train:
-        newvars = []
-        values = officer_df['rank'].unique()
-        feat_dict['rank'] = values
-        officer_df = pd.get_dummies(officer_df, columns=['rank'])
-        for val in values:
-            varname = 'rank_{}'.format(val)
-            newvars.append(varname)
-        return officer_df, feat_dict, newvars
-
-    else:
-        for val in feat_dict['rank']:
-            officer_df['rank_{}'.format(val)] = [1 if rank == val else 0
-                                                 for rank in officer_df['rank']]
-        return officer_df
-
-
-def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
-                            train=True):
-    '''
-    Given the officers dataframe and the their complaint history, creates
-        variables with their complaint counts, percentage of officer complaints,
-        and percentage of sustained complaints.
-    '''
-
-    allegation_df = allegation_df[allegation_df.incident_date <= end_date_set]
-    allegation_df = allegation_df[allegation_df['officer_id']\
-        .isin(officer_df.id.unique())]
-    officer_df['number_complaints'] = 0
-    officer_df['pct_officer_complaints'] = 0.0
-    officer_df['pct_sustained_complaints'] = 0.0
-    off_complaints = allegation_df[allegation_df.is_officer_complaint == True]\
-        .officer_id.value_counts()
-    sustained = allegation_df[allegation_df.final_finding == 'SU'].officer_id\
-        .value_counts()
-    count = allegation_df.officer_id.value_counts()
-
-
-    for oid in allegation_df.officer_id.unique():
-        officer_df.loc[officer_df.id == oid, 'number_complaints'] = count[oid]
-
-        if oid in off_complaints.index:
-            officer_df.loc[officer_df.id == oid, 'pct_officer_complaints'] = \
-            off_complaints[oid] / count[oid]
-
-        if oid in sustained.index:
-            officer_df.loc[officer_df.id == oid, 'pct_sustained_complaints'] = \
-            sustained[oid] / count[oid]
-
-    if train:
-        scaler = MinMaxScaler()
-        officer_df['number_complaints'] = scaler.fit_transform(\
-            np.array(officer_df['number_complaints']).reshape(-1, 1))
-        feat_dict['number_complaints'] = scaler
-
-        return officer_df, feat_dict
-
-    else:
-        scaler = feat_dict['number_complaints']
-        officer_df['number_complaints'] = scaler.transform(\
-            np.array(officer_df['number_complaints']).reshape(-1, 1))
-        return officer_df
 
 
 def create_coaccusals_network(allegation_df, end_date_set):
@@ -422,20 +540,6 @@ def add_investigators_network(network, investigators_df, allegation_df,
                         network.add_edge(iid, oid, count=1, weight=1)
 
     return network
-
-
-
-def used_firearm(officer_df, trr, end_date_set):
-    '''
-    Dummy for identifying officers who used a firearm in the training
-    period.
-    '''
-    train_window = trr.loc[
-        trr.trr_datetime <= end_date_set]
-    firearm_trrs = train_window.loc[train_window.firearm_used]
-    officer_df['used_firearm'] = officer_df.apply(
-        lambda x: 1 if x['id'] in list(firearm_trrs.officer_id) else 0, axis=1)
-    return officer_df
 
 
 def add_same_unit_network(network, history_df, end_date_set):
