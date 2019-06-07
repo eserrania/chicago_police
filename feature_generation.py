@@ -327,7 +327,7 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
     officer_df = officer_df.merge(trr_count, how='left', left_on='id',
                                   right_on='officer_id')
-    print(officer_df.trr_report_count.describe())
+    #print(officer_df.trr_report_count.describe())
 
 
     firearm = trr[trr.firearm_used == True].groupby('officer_id').size()\
@@ -337,7 +337,7 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
 
     officer_df = officer_df.fillna(value={'trr_report_count': 0,
             'shooting_count': 0})
-    print(officer_df.trr_report_count.describe())
+    #print(officer_df.trr_report_count.describe())
 
 
     if train:
