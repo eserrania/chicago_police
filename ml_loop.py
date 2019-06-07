@@ -65,15 +65,17 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
     clfrs, params = define_ml_models(grid, clfrs_to_run)
     # create output dataframe
     output_df = create_output_df(metric_dict)
+    best_mods = {}
 
-    #loops through classifier dictionary
-    for name, clfr in clfrs.items():
-        param_vals = params[name]
+    # loop through TrainTest object list
+    for st, obj in enumerate(set_lst):
+        best_precision = 0
+        best_prec_dict = {}
         # unpack the list of parameters and then run loop on combination
-        for i_p, p in enumerate(list(ParameterGrid(param_vals))):
-            #print(p)
-            # loop through TrainTest object list
-            for st, obj in enumerate(set_lst):
+        for name, clfr in clfrs.items():
+            param_vals = params[name]
+            # loops through classifier dictionary
+            for i_p, p in enumerate(list(ParameterGrid(param_vals))):
                 reg_lst = obj.reg_features
                 aug_lst = obj.aug_features
                 net_lst = list(set(aug_lst) - set(reg_lst))
@@ -128,11 +130,24 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                         update_metrics_df(output_df, y_test, pred_probs, name, importances,
                                           i_p, p, st, ra, label, train_start, train_end,
                                           test_start, test_end, metrics)
+
+                        # keeping track of best precision
+                        cur_prec_5 = output_df.loc[len(output_df) - 1]['precision_at_5']
+                        if cur_prec_5 > best_precision:
+                            best_precision = cur_prec_5
+                            best_prec_dict = {'best_prec': best_precision,
+                                             'predicted_probs': pred_probs,
+                                             'label': test[label],
+                                             'officer_id': test.id}
                         if plot:
                             plot_precision_recall_n(y_test, pred_probs, name, plot)
+                best_mods[st] = pd.DataFrame.from_dict(best_prec_dict)
 
     if csv_name:
         output_df.to_csv(csv_name)
+
+    for key, df in best_mods.items():
+        df.to_csv(str(key) + '_for_aequitas.csv')
 
     return output_df
 
