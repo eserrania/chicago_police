@@ -76,15 +76,15 @@ def generate_features(officer_df, allegation_df, trr_df, victim_df,
                                                              feat_dict)
         features += newvars
 
-        officer_df, feat_dict, newvars = cp.beat_quartile_trrs(officer_df, trr_df,
-                                                           end_date_set,
-                                                           feat_dict)
+        officer_df, feat_dict, newvars = cp.beat_quartile_trrs(officer_df,
+                                                               trr_df,
+                                                               end_date_set,
+                                                               feat_dict)
         features += newvars
 
-        officer_df, feat_dict, newvars = cp.beat_quartile_complaints(officer_df,
-                                                                  allegation_df,
-                                                                  end_date_set,
-                                                                  feat_dict)
+        officer_df, feat_dict, newvars = \
+            cp.beat_quartile_complaints(officer_df, allegation_df, end_date_set,
+                                        feat_dict)
         features += newvars
 
         officer_df, feat_dict, newvars = gen_network_features(officer_df,
@@ -317,6 +317,8 @@ def gen_unit_dummies(officer_df, history_df, end_date_set, feat_dict,
 
 def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
     '''
+    Generate a count of the total trr reports and times an officer used a
+        firearm.
     '''
     trr = trr_df[trr_df.trr_datetime <= end_date_set]
     trr = trr[trr.officer_id.isin(officer_df.id.unique())]
@@ -348,7 +350,7 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
         feat_dict['trr_report_count'] = scaler_1
         feat_dict['shooting_count'] = scaler_2
 
-        return office, feat_dict
+        return officer_df, feat_dict
 
     else:
         scaler_1 = feat_dict['trr_report_count']
@@ -419,6 +421,7 @@ def gen_allegation_features(officer_df, allegation_df, end_date_set, feat_dict,
 def gen_victim_features(officer_df, allegation_df, victim_df, end_date_set,
                         feat_dict, train=True):
     '''
+    Generate a victim count per officer and scale it, as well as percentajer. 
     '''
     officer_df['victim_count'] = 0
     officer_df['black_count'] = 0
