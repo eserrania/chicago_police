@@ -1,3 +1,12 @@
+"""
+CAPP 30254: Final project
+
+
+This file contains the code used to temporally split the data.
+
+"""
+
+
 import pandas as pd
 import numpy as np
 import math

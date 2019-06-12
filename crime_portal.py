@@ -1,3 +1,12 @@
+"""
+CAPP 30254: Final project
+
+
+This file contains the code used to obtain the data recquired from the Chicago
+    Open Data Portal.
+
+"""
+
 import pandas as pd
 import numpy as np
 from sodapy import Socrata
@@ -104,7 +113,8 @@ def beat_quartile_complaints(officer_df, allegation_df, end_date_set,
         right_on=['beat', 'crime_month'])
     officer_quartiles = pd.DataFrame(
         merged_quartiles.groupby(
-            ['officer_id', 'quartile'])['allegation_id'].nunique()).reset_index()
+            ['officer_id', 'quartile'])['allegation_id'].nunique()).\
+        reset_index()
     total_years = (end_date_set - np.datetime64('2010-01-01')) / \
         np.timedelta64(365, 'D')
     officer_quartiles['allegation_id'] = officer_quartiles.allegation_id.map(

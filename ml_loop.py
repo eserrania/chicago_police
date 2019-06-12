@@ -1,10 +1,19 @@
-'''
-Machine learning functions
-'''
+"""
+CAPP 30254: Final project
+
+
+This file contains the code used to run the models with different parameters 
+    and evaluation metrics.
+
+"""
+
 from __future__ import division
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier
-from sklearn.metrics import roc_curve, auc, classification_report, confusion_matrix, accuracy_score
-from sklearn.model_selection import train_test_split, cross_validate, GridSearchCV, ParameterGrid
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier, \
+    GradientBoostingClassifier, AdaBoostClassifier, BaggingClassifier
+from sklearn.metrics import roc_curve, auc, classification_report, \
+    confusion_matrix, accuracy_score
+from sklearn.model_selection import train_test_split, cross_validate, \
+    GridSearchCV, ParameterGrid
 from sklearn import preprocessing, svm, metrics, tree, decomposition
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 #from sklearn.neighbors.nearest_centroid import NearestCentroid
@@ -85,8 +94,8 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                 for ra, feat_lst in reg_aug_dict.items():
                     # labels: ['firearm_outcome', 'sustained_outcome']
                     for label in label_lst:
-                        print('** {} model on outcome {}, TrainTest object {}'.format(
-                              ra, label, st))
+                        print('** {} model on outcome {}, TrainTest object {}'.\
+                            format(ra, label, st))
                         # get data from dictionary
                         train = obj.train
                         test = obj.test
@@ -98,9 +107,10 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                         # instantiate classifier
                         cl = clfr.set_params(**p)
 
-                        print('* Working on the {} classifier with parameters {}.'.format(
-                              name, p))
-                        print('* Training from {} to {} and testing from {} to {}.'.format(
+                        print('* Working on the {} classifier with parameters \
+                            {}.'.format(name, p))
+                        print('* Training from {} to {} and testing from {} to \
+                            {}.'.format(
                               train_start, train_end, test_start, test_end))
 
                         # separate into train, test
@@ -127,12 +137,14 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                         else:
                             importances = cl.feature_importances_
                         # update metrics dataframe
-                        update_metrics_df(output_df, y_test, pred_probs, name, importances,
-                                          i_p, p, st, ra, label, train_start, train_end,
-                                          test_start, test_end, metrics)
+                        update_metrics_df(output_df, y_test, pred_probs, name, 
+                                          importances, i_p, p, st, ra, label,
+                                          train_start, train_end, test_start,
+                                          test_end, metrics)
 
                         # keeping track of best precision
-                        cur_prec_5 = output_df.loc[len(output_df) - 1]['precision_at_5']
+                        cur_prec_5 = output_df.loc[len(output_df) - 1]\
+                            ['precision_at_5']
                         if cur_prec_5 > best_precision:
                             best_precision = cur_prec_5
                             best_prec_dict = {'best_prec': best_precision,
@@ -140,7 +152,8 @@ def classifier_loop(set_lst, grid, clfrs_to_run, metric_dict, label_lst,
                                              'label': test[label],
                                              'officer_id': test.id}
                         if plot:
-                            plot_precision_recall_n(y_test, pred_probs, name, plot)
+                            plot_precision_recall_n(y_test, pred_probs, name,
+                                                    plot)
                 best_mods[st] = pd.DataFrame.from_dict(best_prec_dict)
 
     if csv_name:
@@ -257,11 +270,12 @@ def create_output_df(metric_dict):
     '''
 
     # minimum columns for output dataframe
-    col_lst = ['model', 'importances', 'param_set', 'parameters', 'set', 'type', 'outcome', 'train_start', 'train_end',
-               'test_start', 'test_end']
+    col_lst = ['model', 'importances', 'param_set', 'parameters', 'set', 'type',
+               'outcome', 'train_start', 'train_end', 'test_start', 'test_end']
     # dealing with evaluation metrics
     for metric, threshold_lst in metric_dict.items():
-        if metric == 'precision' or metric == 'recall' or metric == 'f1' or metric == 'accuracy':
+        if metric == 'precision' or metric == 'recall' or metric == 'f1' or \
+            metric == 'accuracy':
             temp_lst = [metric +'_at_' + str(k) for k in threshold_lst]
             col_lst.extend(temp_lst)
         else:
@@ -271,8 +285,9 @@ def create_output_df(metric_dict):
 
     return output_df
 
-def update_metrics_df(output_df, y_test, pred_probs, name, importances, i_p, parameters, st, ra,
-                      label, train_start, train_end, test_start, test_end, metrics):
+def update_metrics_df(output_df, y_test, pred_probs, name, importances, i_p,
+                      parameters, st, ra, label, train_start, train_end,
+                      test_start, test_end, metrics):
     '''
     Updates metrics dataframe
 
@@ -282,8 +297,8 @@ def update_metrics_df(output_df, y_test, pred_probs, name, importances, i_p, par
         - pred_probs:
     '''
     # minimum columns to identify model
-    result_lst = [name, importances, i_p, parameters, st, ra, label, train_start, train_end,
-                  test_start, test_end]
+    result_lst = [name, importances, i_p, parameters, st, ra, label,
+                  train_start, train_end, test_start, test_end]
 
     # list of columns to fill in metrics for
     col_lst = output_df.columns[len(result_lst):]
@@ -343,7 +358,8 @@ def gen_binary_at_k(predicted_scores, k, metrics=None):
         # k is the target percent of population
         #print('population metrics')
         threshold = int(len(predicted_scores) * (k / 100.0))
-        binary_preds = [1 if x < threshold else 0 for x in range(len(predicted_scores))]
+        binary_preds = [1 if x < threshold else 0 for x in range(\
+                len(predicted_scores))]
     else:
         #print('regular metrics')
         threshold = k / 100.0
@@ -358,7 +374,8 @@ def f1_at_k(y_true, y_scores, k, metrics):
     Source: adapted from Rayid Ghani's precision_at_k and recall_at_k functions
         (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
     '''
-    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores),
+                                                           np.array(y_true))
     preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
     f1 = f1_score(y_true_sorted, preds_at_k)
 
@@ -371,7 +388,8 @@ def precision_at_k(y_true, y_scores, k, metrics):
     Source: Rayid Ghani
         (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
     '''
-    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores),
+                                                           np.array(y_true))
     preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
     precision = precision_score(y_true_sorted, preds_at_k)
 
@@ -384,7 +402,8 @@ def recall_at_k(y_true, y_scores, k, metrics):
     Source: Rayid Ghani
         (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
     '''
-    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores),
+                                                           np.array(y_true))
     preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
     recall = recall_score(y_true_sorted, preds_at_k)
 
@@ -397,7 +416,8 @@ def accuracy_at_k(y_true, y_scores, k, metrics):
     Source: adapted from Rayid Ghani's precision_at_k and recall_at_k functions
         (https://github.com/rayidghani/magicloops/blob/master/mlfunctions.py)
     '''
-    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores), np.array(y_true))
+    y_scores_sorted, y_true_sorted = joint_sort_descending(np.array(y_scores),
+                                                           np.array(y_true))
     preds_at_k = gen_binary_at_k(y_scores_sorted, k, metrics)
     accuracy = accuracy_score(y_true_sorted, preds_at_k)
 
@@ -412,7 +432,8 @@ def plot_precision_recall_n(y_true, y_prob, model_name, output_type):
     '''
     from sklearn.metrics import precision_recall_curve
     y_score = y_prob
-    precision_curve, recall_curve, pr_thresholds = precision_recall_curve(y_true, y_score)
+    precision_curve, recall_curve, pr_thresholds = \
+        precision_recall_curve(y_true, y_score)
     precision_curve = precision_curve[:-1]
     recall_curve = recall_curve[:-1]
     pct_above_per_thresh = []

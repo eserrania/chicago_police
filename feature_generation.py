@@ -295,6 +295,7 @@ def gen_unit_dummies(officer_df, history_df, end_date_set, feat_dict,
     history.drop(columns=['effective_date'], inplace=True)
     officer_df = officer_df.merge(history, how='left', left_on='id',
                                   right_on='officer_id')
+    officer_df['unit_id'].fillna('unknown', inplace=True)
     if train:
         newvars = []
         values = officer_df['unit_id'].unique()
@@ -332,18 +333,11 @@ def gen_trr_counts(officer_df, trr_df, end_date_set, feat_dict, train=True):
         .to_frame().reset_index().rename(columns={0: 'shooting_count'})
     officer_df = officer_df.merge(firearm, how='left', left_on='id',
                                   right_on='officer_id')
-    print(len(officer_df[officer_df.trr_report_count.isnull()]))
-    print(len(officer_df[officer_df.shooting_count.isnull()]))
-    officer_df['trr_report_count'].fillna(0, inplace=True)
-    officer_df['shooting_count'].fillna(0, inplace=True)
 
+    officer_df[['trr_report_count', 'shooting_count']] = \
+        officer_df[['trr_report_count', 'shooting_count']].fillna(0)
     officer_df.fillna(value={'trr_report_count': 0.0,
             'shooting_count': 0.0}, inplace=True)
-    print(officer_df.trr_report_count.max())
-
-    print(len(officer_df[officer_df.trr_report_count.isnull()]))
-    print(len(officer_df[officer_df.shooting_count.isnull()]))
-
 
 
     if train:

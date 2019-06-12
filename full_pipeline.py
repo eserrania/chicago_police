@@ -1,3 +1,11 @@
+"""
+CAPP 30254: Final project
+
+
+This file contains TrainTest and RawDfs classes.
+
+"""
+
 import read_data as rd
 import train_test as tt
 import feature_generation as fg
@@ -150,7 +158,8 @@ class TrainTest:
         self.train = self.officer_df.loc[(
             self.officer_df.appointed_date < self.start_date_outcome)\
              & ((self.officer_df.resignation_date >= \
-                self.start_date_train) | self.officer_df.resignation_date.isna())]
+                self.start_date_train) | \
+                    self.officer_df.resignation_date.isna())]
         self.test = self.officer_df.loc[(
             self.officer_df.appointed_date < self.end_date_test) & \
             (self.officer_df.resignation_date >= \
@@ -172,11 +181,13 @@ class TrainTest:
                                  self.end_date_train)
 
         print("Train")
-        print(self.trr_set.get('train').groupby('firearm_used')['officer_id'].nunique())
+        print(self.trr_set.get('train').groupby('firearm_used')['officer_id'].\
+            nunique())
         print(self.train.groupby('used_firearm')['id'].nunique())
         print(self.train.groupby('firearm_outcome')['id'].nunique())
         print()
-        print(self.allegation_set.get('train').groupby('final_finding')['officer_id'].nunique())
+        print(self.allegation_set.get('train').\
+            groupby('final_finding')['officer_id'].nunique())
         print(self.train.groupby('sustained_outcome')['id'].nunique())
         print()
 
@@ -194,10 +205,12 @@ class TrainTest:
                                         feat_dict=self.feature_dict)
 
         print("Test")
-        print(self.trr_set.get('test').groupby('firearm_used')['officer_id'].nunique())
+        print(self.trr_set.get('test').groupby('firearm_used')['officer_id']\
+            .nunique())
         print(self.test.groupby('used_firearm')['id'].nunique())
         print(self.test.groupby('firearm_outcome')['id'].nunique())
         print()
-        print(self.allegation_set.get('test').groupby('final_finding')['officer_id'].nunique())
+        print(self.allegation_set.get('test').groupby('final_finding')\
+            ['officer_id'].nunique())
         print(self.test.groupby('sustained_outcome')['id'].nunique())
         print()

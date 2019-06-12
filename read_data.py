@@ -1,6 +1,10 @@
-'''
-Read data
-'''
+"""
+CAPP 30254: Final project
+
+
+This file contains the code used to read the data used for the project.
+
+"""
 
 from shapely.geometry import Polygon
 from shapely.geometry import Point
@@ -51,10 +55,13 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                           'first_start_date']},
              'officerallegation': {'use_cols': ['id', 'start_date', 'end_date',
                                                  'recc_finding',
-                                                 'recc_outcome', 'final_finding',
+                                                 'recc_outcome',
+                                                 'final_finding',
                                                  'final_outcome_class',
-                                                 'allegation_category_id', 'officer_id',
-                                                 'disciplined', 'allegation_id'],
+                                                 'allegation_category_id',
+                                                 'officer_id',
+                                                 'disciplined',
+                                                 'allegation_id'],
                                     'data_types': {'id': 'str',
                                                    'start_date': 'str',
                                                    'end_date': 'str',
@@ -62,12 +69,14 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                                    'recc_outcome': 'str',
                                                    'final_finding': 'str',
                                                    'final_outcome': 'str',
-                                                   'allegation_category_id': 'str',
+                                                   'allegation_category_id':
+                                                   'str',
                                                    'officer_id': 'str',
                                                    'disciplined': 'str',
                                                    'allegation_id': 'str'},
                                     'date_cols': ['start_date', 'end_date']},
-             'allegationcategory': {'use_cols': ['id', 'category_code', 'category',
+             'allegationcategory': {'use_cols': ['id', 'category_code',
+                                                 'category',
                                        'allegation_name', 'citizen_dept'],
                           'data_types': {'id': 'str',
                                          'category_code': 'str',
@@ -109,7 +118,8 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                        'age_at_hire': 'float',
                                        'officer_id': 'str',
                                        'rank_changed': 'bool'},
-                        'date_cols': ['org_hire_date', 'spp_date', 'start_date']},
+                        'date_cols': ['org_hire_date', 'spp_date',
+                                      'start_date']},
                 'trr_trr': {'use_cols': ['id', 'beat', 'block', 'direction',
                                          'street', 'location',
                                          'trr_datetime', 'indoor_or_outdoor',
@@ -132,7 +142,8 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                          'officer_injured',
                                          'officer_rank', 'subject_id',
                                          'subject_armed', 'subject_injured',
-                                         'subject_alleged_injury', 'subject_age',
+                                         'subject_alleged_injury',
+                                         'subject_age',
                                          'subject_birth_year',
                                          'subject_gender', 'subject_race',
                                          'officer_id', 'officer_unit_id',
@@ -148,13 +159,15 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                              'notify_district_sergeant': 'bool',
                                              'notify_OP_command': 'bool',
                                              'notify_DET_division': 'bool',
-                                             'number_of_weapons_discharged': 'float',
+                                             'number_of_weapons_discharged':
+                                             'float',
                                              'party_fired_first': 'str',
                                              'location_recode': 'str',
                                              'taser': 'bool',
                                              'total_number_of_shots': 'float',
                                              'firearm_used': 'bool',
-                                             'number_of_officers_using_firearm': 'float',
+                                             'number_of_officers_using_firearm':
+                                             'float',
                                              'officer_assigned_beat': 'str',
                                              'officer_on_duty': 'bool',
                                              'officer_in_uniform': 'bool',
@@ -196,10 +209,14 @@ data_dict = {'officer': {'use_cols': ['id', 'gender', 'race', 'appointed_date',
                                             'data_types': {'id': 'str',
                                                            'current_star': 'str',
                                                            'current_rank': 'str',
-                                                           'current_unit_id': 'str',
-                                                           'investigator_id': 'str',
-                                                           'investigator_type': 'str',
-                                                           'allegation_id': 'str'},
+                                                           'current_unit_id':
+                                                           'str',
+                                                           'investigator_id':
+                                                           'str',
+                                                           'investigator_type':
+                                                           'str',
+                                                           'allegation_id':
+                                                           'str'},
                                             'date_cols': []},
                 'officerhistory': {'use_cols': ['id', 'effective_date',
                                                 'end_date', 'officer_id',
@@ -234,7 +251,8 @@ def create_df(name):
     try:
         if name == 'geocoordinates':
             df = pd.read_csv('data/' + name + '.csv')
-            df['geometry'] = df.apply(lambda x: Point(float(x.x), float(x.y)), axis=1)
+            df['geometry'] = df.apply(lambda x: Point(float(x.x), float(x.y)),
+                                      axis=1)
             df = gpd.GeoDataFrame(df)
         else:
             dict = data_dict[name]
@@ -257,7 +275,10 @@ def merge_data(allegation_df, officerallegation_df, investigator_df,
     Merge allegation with officer allegation data and investigator with
     investigator allegation.
     '''
-    allegationm_df = allegation_df.merge(officerallegation_df, left_on='crid', right_on='allegation_id')
-    investigatorm_df = investigator_df.merge(investigatorallegation_df, left_on='id', right_on='investigator_id')
+    allegationm_df = allegation_df.merge(officerallegation_df, left_on='crid',
+                                         right_on='allegation_id')
+    investigatorm_df = investigator_df.merge(investigatorallegation_df,
+                                             left_on='id',
+                                             right_on='investigator_id')
 
     return (allegationm_df, investigatorm_df)
