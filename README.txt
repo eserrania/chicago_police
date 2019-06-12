@@ -1,7 +1,7 @@
-CAPP 30254 Machine Learning for Public Policy
-Final Project
+### CAPP 30254 Machine Learning for Public Policy
+### Final Project
 
-The Role of Networks in “Bad Actor” Identification: Informing Investigative Journalism
+## The Role of Networks in “Bad Actor” Identification: Informing Investigative Journalism
 
 
 Aequitas.ipynb: run aequitas module to test for fariness and bias of the models
@@ -9,6 +9,8 @@ Aequitas.ipynb: run aequitas module to test for fariness and bias of the models
 crime_portal.py: adds features generated from the Chicago Open Data Portal
 
 data: folder containing the data used for the project
+
+descriptive_stats.ipynb: some descriptive statistics of the data
 
 feature_generation.py: contains the code that generates the model's features
 
