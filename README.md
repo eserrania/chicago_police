@@ -1,8 +1,6 @@
+## The Role of Networks in “Bad Actor” Identification: Informing Investigative Journalism
 ### CAPP 30254 Machine Learning for Public Policy
 ### Final Project
-
-## The Role of Networks in “Bad Actor” Identification: Informing Investigative Journalism
-
 
 Aequitas.ipynb: run aequitas module to test for fariness and bias of the models
 
