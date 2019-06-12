@@ -2,7 +2,7 @@
 ### CAPP 30254 Machine Learning for Public Policy
 ### Final Project
 
-Aequitas.ipynb: run aequitas module to test for fariness and bias of the models
+Aequitas.ipynb: run aequitas module to test for fairness and bias of the models
 
 crime_portal.py: adds features generated from the Chicago Open Data Portal
 
