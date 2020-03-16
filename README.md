@@ -4,6 +4,8 @@
 
 This project contains the implementation of a Machine Learning pipeline to identify bad actors among Chicago Police Department officers.
 
+#### Files:
+
 Aequitas.ipynb: run aequitas module to test for fairness and bias of the models
 
 crime_portal.py: adds features generated from the Chicago Open Data Portal
