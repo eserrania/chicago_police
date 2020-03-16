@@ -2,11 +2,13 @@
 ### CAPP 30254 Machine Learning for Public Policy
 ### Final Project
 
+This project contains the implementation of a Machine Learning pipeline to identify bad actors among Chicago Police Department officers.
+
 Aequitas.ipynb: run aequitas module to test for fairness and bias of the models
 
 crime_portal.py: adds features generated from the Chicago Open Data Portal
 
-data: folder containing the data used for the project
+data: folder containing data from the Invisible Institue Citizens Police Data Project that was used used for this project 
 
 descriptive_stats.ipynb: some descriptive statistics of the data
 
