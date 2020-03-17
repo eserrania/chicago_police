@@ -2,6 +2,10 @@
 ### CAPP 30254 Machine Learning for Public Policy
 ### Final Project
 
+### Krista Chan
+### Andres Nigenda
+### Jose Elias Serrania Bravo
+
 This project contains the implementation of a Machine Learning pipeline to identify bad actors among Chicago Police Department officers.
 
 #### Files:
